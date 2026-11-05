@@ -44,9 +44,9 @@ $("#interface").innerHTML = `
   <div id="crosshair">＋</div><div id="damage-flash"></div><div class="vignette"></div>
   <div id="toast" role="status"></div>
   <footer id="hud" class="hidden"><div class="vitals"><div class="identity"><span class="portrait">⟐</span><div><span class="eyebrow">ANDARILHO DIMENSIONAL</span><h3>Kaeron <small>01</small></h3></div></div><div class="bar-label"><span>VITALIDADE</span><span id="hp-text">100 / 100</span></div><div class="bar health"><div id="hp"></div></div><div class="bar-label energy-label"><span>ENERGIA</span><span id="energy-text">100 / 100</span></div><div class="bar energy"><div id="energy"></div></div></div><div class="combat"><button id="attack-button" title="Ataque leve — clique esquerdo"><span class="ability-icon">╱</span><span>CORTE DO LIMIAR</span><kbd>CLIQUE ESQUERDO</kbd><div id="cooldown"></div></button><div class="future"><span>◇</span><small>OUTROS PODERES<br>EM BREVE</small></div></div><div class="hints"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> MOVER</span><span>⌖ MOUSE PARA MIRAR</span><span><kbd>ESC</kbd> PAUSAR</span></div></footer>
-  <div id="overlay"><div class="menu-copy"><span class="eyebrow">UMA JORNADA ENTRE FRAGMENTOS</span><h1>NEXUS<span>SHATTERED REALMS</span></h1><div class="gold-rule"></div><p class="intro">O mundo se partiu.<br>A última centelha ainda resiste.</p><p class="description">Atravesse as ruínas de um reino suspenso no vazio.<br>Enfrente a corrupção. Restaure o que restou.</p><button id="start" class="primary">INICIAR JORNADA <span>→</span></button><div class="menu-controls"><span>WASD <small>MOVER</small></span><span>MOUSE <small>MIRAR E ATACAR</small></span></div><label class="quality-label">QUALIDADE GRÁFICA <select id="quality"><option value="low">Baixa</option><option value="medium" selected>Média</option><option value="high">Alta</option></select></label></div><div class="menu-bottom"><span>FASE 1 · FUNDAÇÃO JOGÁVEL</span><span>UM MUNDO CONSTRUÍDO POR MATEMÁTICA</span></div></div>
+  <div id="overlay"><div class="menu-copy"><span class="eyebrow">UMA JORNADA ENTRE FRAGMENTOS</span><h1>NEXUS<span>SHATTERED REALMS</span></h1><div class="gold-rule"></div><p class="intro">O mundo se partiu.<br>A última centelha ainda resiste.</p><p class="description">Atravesse as ruínas de um reino suspenso no vazio.<br>Enfrente a corrupção. Restaure o que restou.</p><button id="start" class="primary">INICIAR JORNADA <span>→</span></button><div class="menu-controls"><span>WASD <small>MOVER</small></span><span>MOUSE <small>MIRAR E ATACAR</small></span></div><label class="quality-label">QUALIDADE GRÁFICA <select id="quality"><option value="low">Baixa</option><option value="medium" selected>Média</option><option value="high">Alta</option></select></label><label class="quality-label">DEADZONE <input id="deadzone" type="range" min="0.05" max="0.4" step="0.01" aria-label="Deadzone dos analógicos"><output id="deadzone-value"></output></label><label class="quality-label">CONTROLE ATIVO <select id="gamepad-select" aria-label="Controle ativo"><option value="auto">Automático</option></select></label></div><div class="menu-bottom"><span>FASE 1 · FUNDAÇÃO JOGÁVEL</span><span>UM MUNDO CONSTRUÍDO POR MATEMÁTICA</span></div></div>
   <div id="dialog" class="hidden" role="dialog" aria-modal="true"><div><span class="eyebrow" id="dialog-kicker"></span><h1 id="dialog-title"></h1><p id="dialog-copy"></p><button id="resume" class="primary"></button><button id="menu-button" class="secondary">VOLTAR AO MENU</button></div></div>
-  <div id="metrics"></div>`;
+  <div id="input-status" role="status"></div><div id="metrics"></div>`;
 
 const params = new URLSearchParams(location.search);
 const seed = Number(params.get("seed") || 7341) >>> 0;
@@ -357,6 +357,29 @@ function applyQuality(value: string) {
   bloom.strength = high ? 0.55 : 0.42;
   resize();
 }
+const deadzoneSlider=$<HTMLInputElement>('#deadzone');deadzoneSlider.value=String(input.deadzone);
+$('#deadzone-value').textContent=Math.round(input.deadzone*100)+'%';
+deadzoneSlider.oninput=()=>{input.saveDeadzone(Number(deadzoneSlider.value));$('#deadzone-value').textContent=Math.round(input.deadzone*100)+'%';};
+$('#gamepad-select').onchange=e=>{const value=(e.target as HTMLSelectElement).value;input.selectGamepad(value==='auto'?null:Number(value));};
+let padListSignature='';
+function updateInputUI(){
+ const pads=input.available(),signature=pads.map(p=>p.index+':'+p.id+':'+p.mapping).join('|');
+ if(signature!==padListSignature){padListSignature=signature;const select=$<HTMLSelectElement>('#gamepad-select');select.replaceChildren(new Option('Automático','auto'));for(const p of pads){const option=new Option(`${p.index+1}: ${p.id.slice(0,45)}`,String(p.index));option.disabled=p.mapping!=='standard';select.add(option);}}
+ $('#input-status').textContent=controls.unsupported?'Mapeamento não padrão · use teclado ou um controle padrão':controls.source==='gamepad'?`CONTROLE ${Number(controls.gamepad)+1} · X / □ ATACAR · MENU PAUSAR`:`TECLADO / MOUSE${controls.pads?' · CONTROLE CONECTADO':''}`;
+}
+function handleMenuInput(){
+ if(mode==='playing')return;
+ const candidates=mode==='menu'?['#start','#quality','#deadzone','#gamepad-select']:['#resume','#menu-button'];
+ const elements=candidates.map(s=>$(s));let index=elements.indexOf(document.activeElement as HTMLElement);
+ if(controls.navigate){
+  const focused=elements[index];
+  if(focused instanceof HTMLSelectElement){focused.selectedIndex=Math.max(0,Math.min(focused.options.length-1,focused.selectedIndex+controls.navigate));focused.dispatchEvent(new Event('change'));}
+  else if(focused instanceof HTMLInputElement){focused.value=String(Math.max(.05,Math.min(.4,Number(focused.value)+controls.navigate*.01)));focused.dispatchEvent(new Event('input'));}
+  else {index=(index+controls.navigate+elements.length)%elements.length;elements[index].focus();}
+ }
+ if(controls.confirm){if(index<0)index=0;const selected=elements[index];if(selected instanceof HTMLButtonElement)selected.click();else elements[(index+1)%elements.length].focus();}
+ if(controls.back&&mode==='paused')setMode('playing');else if(controls.back&&mode!=='menu')setMode('menu');
+}
 $("#quality").onchange = (e) =>
   applyQuality((e.target as HTMLSelectElement).value);
 function resize() {
@@ -533,7 +556,8 @@ function simulate(dt:number) {
     player.root.position.z = next.z;
     actualSpeed=Math.hypot(next.x-before.x,next.z-before.z)/dt;
     if (attack === 0) {
-      if (mouseAiming)
+      if(controls.aim){const aimWorld=new T.Vector3(cameraOffset.z,0,-cameraOffset.x).normalize().multiplyScalar(controls.aim.x).add(new T.Vector3(-cameraOffset.x,0,-cameraOffset.z).normalize().multiplyScalar(-controls.aim.y));player.root.rotation.y=dampAngle(player.root.rotation.y,Math.atan2(aimWorld.x,aimWorld.z),18,dt);}
+      else if (mouseAiming)
         player.root.rotation.y = dampAngle(
           player.root.rotation.y,
           Math.atan2(aim.x - next.x, aim.z - next.z),
@@ -624,6 +648,7 @@ function frame(now:number) {
   controls=input.read();
   pointer.set(controls.pointer.x,controls.pointer.y);mouseAiming=controls.mouseAim;
   if(controls.pause){if(mode==='playing')setMode('paused');else if(mode==='paused')setMode('playing');}
+  handleMenuInput();updateInputUI();
   if(controls.attack)startAttack();
   if(mode==='playing'||mode==='menu')clock.advance(dt,simulate);else clock.reset();
   if (mode === "playing" || mode === "menu") temple.update(time);

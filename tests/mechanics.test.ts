@@ -80,3 +80,11 @@ test('fixed clock bounds long suspension, resets pending time and never runs a g
 test('keyboard falls back to key when browser omits physical code',()=>{
  assert.equal(keyboardCode({key:'W',code:''}),'KeyW');assert.equal(keyboardCode({key:'z',code:'KeyW'}),'KeyW');
 });
+
+import { radialDeadzone } from '../src/input';
+test('analogue radial deadzone eliminates drift, scales proportionally and caps diagonals',()=>{
+ assert.deepEqual(radialDeadzone(.08,.07,.18),{x:0,y:0});
+ const half=radialDeadzone(.5,0,.18);assert.ok(half.x>.3&&half.x<.5);assert.equal(half.y,0);
+ const full=radialDeadzone(1,1,.18);assert.ok(Math.abs(Math.hypot(full.x,full.y)-1)<1e-9);
+ assert.deepEqual(radialDeadzone(NaN,Infinity,.18),{x:0,y:0});
+});

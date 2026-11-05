@@ -653,3 +653,4 @@ h3 small {
     display: none;
   }
 }
+#input-status{position:absolute;bottom:10px;left:42px;font-size:8px;letter-spacing:1px;color:#8294a7;z-index:4}#deadzone{width:100px;accent-color:#bba37b;pointer-events:auto}.quality-label{margin-top:12px}.menu-copy{top:18%}canvas:focus{outline:none}.quality-label output{min-width:28px}

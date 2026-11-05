@@ -1,0 +1,16 @@
+{
+  "results": [
+    "Connection and controller-only start",
+    "Radial deadzone prevents drift",
+    "Full and proportional analogue movement",
+    "Right stick aims independently",
+    "Controller attack is edge-triggered, not repeated while held",
+    "Switch keyboard to gamepad without restart",
+    "Multiple controllers choose active device and disconnect stops motion",
+    "Unmapped controller is safely ignored",
+    "Controller pause, navigation, resume and restart"
+  ],
+  "errors": [],
+  "physicalDevicesTested": false,
+  "mock": "navigator.getGamepads with standard buttons/axes and connection events"
+}
