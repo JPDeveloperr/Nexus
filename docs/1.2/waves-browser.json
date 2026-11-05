@@ -1,0 +1,42 @@
+{
+  "results": [
+    "Initial wave has three sentinels and one raider, valid spawns",
+    "Four waves progress through real sword damage and finish in victory",
+    "Restart restores first wave, health/energy, charge, dodge and hazard pools"
+  ],
+  "errors": [],
+  "waveHistory": [
+    {
+      "wave": 1,
+      "alive": 4,
+      "pending": 0
+    },
+    {
+      "wave": 2,
+      "alive": 5,
+      "pending": 0
+    },
+    {
+      "wave": 3,
+      "alive": 5,
+      "pending": 0,
+      "screenshot": true
+    },
+    {
+      "wave": 4,
+      "alive": 6,
+      "pending": 1,
+      "screenshot": true
+    }
+  ],
+  "peak": 6,
+  "kinds": [
+    "sentinel",
+    "raider",
+    "archer",
+    "brute"
+  ],
+  "shots": 2,
+  "shocks": 1,
+  "method": "Controlled RAF and player/enemy position fixtures; real input, hitboxes, damage, HP, AI and wave transitions"
+}

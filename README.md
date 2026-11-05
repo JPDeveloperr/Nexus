@@ -1,129 +1,120 @@
-# NEXUS: Shattered Realms — 1.1
+# NEXUS: Shattered Realms — 1.2 CRIMSON FURY
 
-Um action RPG isométrico de fantasia sombria, construído com TypeScript, Three.js e geometria procedural. **Fase 1 com a atualização 1.1: Movement, Controller & Combat Polish.** Mantém a arena e o conteúdo da fundação, acrescenta entrada por controle e refina movimentação e golpe básico. Não inclui ataque pesado, esquiva, combos, habilidades, chefe ou progressão das fases seguintes.
+Jogo de ação isométrico com Three.js, TypeScript e geometria procedural. A versão 1.2 parte da [1.1, commit 1996bde](https://github.com/JPDeveloperr/Nexus/commit/1996bde4cb555aec89f150f7ded5b36d0cbe3996) e mantém a arena, Kaeron, a iluminação e as sentinelas. Acrescenta combate rápido, Crimson Strike, Phantom Dodge, três arquétipos e quatro ondas.
 
-![Templo das Ruínas Suspensas — atualização 1.1](docs/1.1/regression/screenshots/02-gameplay.png)
+## Executar no Fedora KDE / Konsole / Fish
 
-## Executar no Fedora KDE (Konsole / Fish)
-
-Requisitos: Node.js **22.12+ ou 24 LTS**, npm e um navegador com WebGL2 / aceleração gráfica. Nenhum comando exige Bash, Docker, serviços externos, chave de API ou assets remotos.
-
-Na pasta do projeto:
+Requisitos: Node.js **22.12+ ou 24 LTS**, npm e navegador com WebGL2/aceleração gráfica. Sem backend, conta externa ou assets remotos.
 
 ```fish
-npm install
-npm run dev
-```
-
-Abra o endereço informado pelo Vite no navegador. Para uma instalação reproduzível, use `npm ci` no lugar de `npm install`. Se Node.js não estiver instalado no Fedora, instale-o pelo gerenciador de pacotes do sistema (`sudo dnf install nodejs npm`) e confira `node --version`.
-
-```fish
-npm test
-npm run build
-npm run preview
-```
-
-`build` verifica os tipos e gera `dist/`. Esse diretório pode ser servido por qualquer servidor estático; o jogo não tem backend. A distribuição desktop ainda não foi implementada. O projeto não foi executado diretamente no Fedora ou Windows nesta entrega.
-
-## Como jogar
-
-Clique em **Iniciar jornada**. Elimine as três sentinelas para purificar o santuário. O anel vermelho anuncia um ataque: afaste-se antes do impacto. O ataque de Kaeron interrompe a preparação do inimigo. A lâmina precisa realmente atravessar o corpo da sentinela durante a execução do corte. Seu alcance permite atacar antes que ela se aproxime. A energia se recompõe automaticamente.
-
-| Comando            | Ação                                                |
-| ------------------ | --------------------------------------------------- |
-| W A S D            | Mover em relação à tela, com diagonais normalizadas |
-| Mouse              | Orientar Kaeron no plano da arena                   |
-| Clique esquerdo    | Corte do Limiar, ataque básico                      |
-| J                  | Alternativa de teclado para atacar na direção atual |
-| Esc / botão Pausar | Pausar e continuar                                  |
-
-Ao perder toda a vida, use **Recomeçar no limiar**. As três sentinelas e seus recursos são restaurados. A pausa também acontece ao sair da aba ou perder o foco. Baixa, Média e Alta regulam resolução interna, sombras e bloom no menu principal. Não há suporte mobile/touch nesta fase.
-
-**Combate:** 100 de vida, 14 de dano por ataque inimigo, 34 de dano por corte, custo de 18 de energia, regeneração de 15/s, duração de ataque 0,52 s, antecipação de 0,12 s, janela de execução entre 0,12 e 0,34 s e alcance máximo de 3,1 unidades. O acerto usa o volume planar varrido pela lâmina entre passos de simulação; cada inimigo recebe no máximo um acerto por golpe. As sentinelas anunciam ataques por 0,8 s e recuperam por 0,9 s. Não há dano por contato.
-
-Esquiva, ataque pesado, combo, Q/E/R, chefe e progressão não fazem parte da Fase 1. Os slots futuros da interface não representam habilidades disponíveis.
-
-## Mundo e arquitetura
-
-- `src/main.ts`: integração do jogo, estados, combate, IA, câmera, interface, áudio sintético e pós-processamento.
-- `src/input.ts`: teclado/mouse, Gamepad API padrão, seleção de dispositivo, deadzone e ações por borda de botão.
-- `src/timing.ts`: simulação em passos fixos com recuperação limitada.
-- `src/combat.ts` e `src/combat-effects.ts`: curvas do golpe, hitbox varrida e rastro ligado à lâmina.
-- `src/visuals.ts`: personagem hierárquico articulado, capa deformável, espada extrudada e geração do templo.
-- `src/mechanics.ts`: regras puras de colisão, arco de ataque, interpolação angular e PRNG determinístico.
-- `src/style.css`: interface responsiva, menus e HUD.
-- `tests/`: testes matemáticos e integração real em Chromium.
-
-A arena usa a semente **7341**; experimente `?seed=1234` no endereço para gerar variações de alturas, pedras e distribuição de detalhes. A arquitetura da área navegável é deliberadamente fixa para manter rotas de combate livres. O piso usa `InstancedMesh`; as faíscas reutilizam um pool fixo de 200 partículas. Pedra, metal, visor, cristais, capa e espada são gerados em código. O portal usa GLSL com fluxo de energia animado. Não há modelos, imagens, fontes nem áudio baixados durante o jogo.
-
-A simulação usa passos fixos de 1/60 s, preservando o tempo entre frames (até 0,5 s de recuperação por frame) em vez de descartar todo o delta acima de 50 ms. Pausa e perda de foco zeram o acumulador; não há recuperação de tempo passado em segundo plano. A velocidade tem aceleração/desaceleração suave e a passada acompanha o deslocamento real.
-
-A física é planar: círculos com subpassos, deslizamento em obstáculos e limite circular da ilha. Não há saltos, quedas ou simulação volumétrica; Rapier não é necessário para este escopo. A IA tem patrulha, detecção/perseguição, preparação, ataque, recuperação, reação e morte. Após travamentos superiores a 0,5 s, a recuperação continua limitada para evitar grandes saltos. O renderizador por software ainda pode ter FPS baixo; esta atualização não comprova 60 FPS.
-
-## Testes e evidências
-
-Veja [o relatório da atualização 1.1](docs/1.1/TESTES.md), os resultados JSON em `docs/1.1/` e a sequência real do golpe em `docs/1.1/screenshots/`. O relatório anterior da Fase 1 foi preservado em `docs/TESTES.md`.
-
-Para repetir os testes de navegador, mantenha `npm run dev` em outro terminal:
-
-```fish
-npm run test:browser
-```
-
-Por padrão o teste usa Chromium em `/usr/bin/chromium` com ANGLE SwiftShader (renderização por software). Se precisar, instale `chromium` no Fedora. Para outro executável:
-
-```fish
-set -x CHROMIUM_PATH /caminho/para/chromium
-npm run test:browser
-```
-
-`NEXUS_URL` pode apontar para outro servidor, incluindo `?test=1`. Apenas esse parâmetro habilita a API de inspeção usada pelos testes. Ela observa o estado e posiciona o jogador para cenários isolados; ataques e danos ainda passam pelas entradas reais e pelo ciclo de jogo. Não existe no modo normal.
-
-A meta de 60 FPS em 1080p **não foi comprovada**. O teste disponível usa software, não uma GPU intermediária. O relatório distingue esses resultados. O bundle contém o renderizador Three.js e gera um aviso de tamanho do Vite; isso não é falha de build.
-
-Para medir uma amostra real em 1080p contra `npm run preview -- --port 5174`, execute `node tests/performance.mjs`. Ele registra 30 frames após aquecimento em `docs/performance.json`; o teste padrão usa software e não substitui medições com GPU real.
-
-## Controle — Xbox / PlayStation
-
-Conecte o controle por USB ou Bluetooth e pressione um botão para o navegador disponibilizá-lo. Use um navegador atualizado em contexto seguro (HTTPS ou localhost). Dispositivos reconhecidos como `mapping: standard` usam o mesmo esquema na Gamepad API: Xbox One/Series, DualShock 4 e DualSense podem funcionar por esse mapeamento. **Não houve teste com dispositivos físicos** nesta entrega. Dispositivos com mapeamento desconhecido são indicados e ignorados, mantendo o teclado disponível.
-
-| Entrada                                         | Ação disponível                                  |
-| ----------------------------------------------- | ------------------------------------------------ |
-| Analógico esquerdo                              | Movimento proporcional à inclinação              |
-| Analógico direito                               | Orientação independente                          |
-| X / Quadrado                                    | Ataque básico; segurar não repete                |
-| Menu / Options                                  | Pausar / continuar                               |
-| A / X (nos menus)                               | Confirmar botão / avançar entre configurações    |
-| D-pad cima/baixo ou analógico esquerdo vertical | Navegar; no campo de configuração, ajustar valor |
-| B / Círculo (nos menus)                         | Voltar; retoma jogo quando pausado               |
-
-Os botões de pesado, esquiva, especial, suprema e interação ficam reservados; não executam ações de fases futuras. A deadzone radial padrão é 18%, ajustável de 5% a 40% no menu e salva localmente quando o navegador permite. O seletor de controle permite escolher um dispositivo; no modo Automático, atividade em outro controle padrão o torna ativo. O indicador inferior informa a entrada usada. Teclado/mouse e controle podem ser alternados sem reiniciar. Solte o analógico após trocar para teclado; mova-o novamente para retomar o controle. Desconectar o controle ativo remove sua entrada, sem deixar o movimento preso.
-
-O ataque tem buffer de 180 ms: um novo comando próximo ao final da recuperação inicia o próximo corte. Comandos antigos expiram. A direção fica travada durante o golpe; movimento continua em velocidade reduzida e volta suavemente à corrida após a recuperação. Um hitstop limitado a aproximadamente 50 ms reforça cada contato.
-
-## Testar a atualização 1.1
-
-Com `npm run dev` em outro terminal:
-
-```fish
-npm test
-npm run test:movement
-npm run test:controller
-npm run test:combat
-npm run test:browser
-```
-
-Os testes de movimento mantêm WASD por dois segundos de **tempo real**. O teste de controle injeta objetos padrão em `navigator.getGamepads()` e eventos de conexão/desconexão; ele não substitui hardware físico. O teste de combate controla `requestAnimationFrame` a 60 Hz para inspecionar as fases, mas usa renderização WebGL, entradas, animação, colisão e dano reais. Os demais testes de navegador usam o relógio normal. Para testar o build de produção, execute `npm run build`, `npm run preview -- --port 5174` e use `set -x NEXUS_URL 'http://127.0.0.1:5174/?test=1'` no terminal dos testes.
-
-## Atualizar no Fedora / Fish
-
-Na pasta do clone existente, confira `git status` e preserve suas alterações locais antes de trocar de branch:
-
-```fish
-git fetch origin feature/nexus-1.1-movement-combat
-git switch -c feature/nexus-1.1-movement-combat FETCH_HEAD
 npm ci
 npm run dev
 ```
 
-Se a branch já existir localmente, use `git switch feature/nexus-1.1-movement-combat` e `git pull --ff-only origin feature/nexus-1.1-movement-combat` antes de instalar. O uso de `FETCH_HEAD` também funciona com o clone original feito com `--single-branch`. A branch `main` permanece preservada.
+Abra o endereço informado pelo Vite. `npm install` também funciona; `npm ci` reproduz o lockfile. Se faltarem os programas no Fedora: `sudo dnf install git nodejs npm`. Confira a versão com `node --version`.
+
+```fish
+npm run build
+npm run preview
+```
+
+O build valida TypeScript e gera `dist/` para hospedagem estática. A distribuição desktop ainda não foi implementada.
+
+## Atualizar o clone anterior
+
+Na pasta do seu clone, preserve alterações locais antes de trocar de branch:
+
+```fish
+git fetch origin feature/nexus-1.2-crimson-fury
+git switch -c feature/nexus-1.2-crimson-fury FETCH_HEAD
+npm ci
+npm run dev
+```
+
+Isso funciona inclusive com o clone original feito com `--single-branch`. Se a branch já existir localmente, use `git switch feature/nexus-1.2-crimson-fury` e `git pull --ff-only origin feature/nexus-1.2-crimson-fury`. `main` e as entregas anteriores permanecem preservadas.
+
+## Controles
+
+| Ação              | Teclado/mouse      | Xbox               | PlayStation                |
+| ----------------- | ------------------ | ------------------ | -------------------------- |
+| Movimento         | WASD               | Analógico esquerdo | Analógico esquerdo         |
+| Orientação        | Mouse              | Analógico direito  | Analógico direito          |
+| Corte básico      | Clique esquerdo    | X                  | Quadrado                   |
+| Crimson Strike    | Segurar J e soltar | Segurar Y e soltar | Segurar Triângulo e soltar |
+| Phantom Dodge     | Espaço             | B                  | Círculo                    |
+| Pausa / continuar | Esc                | Menu               | Options                    |
+
+**J agora carrega a espada; não é mais um atalho do corte básico.** A/X é confirmação de menu, não esquiva. Nos menus, D-pad ou analógico vertical navega/ajusta; A/X confirma ou avança ao próximo campo; B/Círculo volta. Há botões de corte e esquiva no HUD. Escolha qualidade gráfica, deadzone e controle ativo no menu.
+
+São usados os índices padrão da Gamepad API. Xbox One/Series e DualShock 4/DualSense devem ser reconhecidos pelo navegador como `mapping: standard`; **não houve teste com controles físicos**. Dispositivos não padronizados são indicados e ignorados com segurança. USB/Bluetooth dependem do sistema e do navegador. Use HTTPS ou localhost e pressione um botão para o navegador disponibilizar o controle.
+
+A leitura do gamepad roda a 120 Hz, separada dos renders, com fila ordenada de pressionar/soltar. Cargas que começam e terminam entre frames preservam a duração observada. Não é possível garantir captura de pulsos que o navegador/hardware nunca exponha, nem executar timers durante bloqueio completo da thread. Deadzone radial padrão 18%, configurável entre 5% e 40%, com persistência local opcional. É possível trocar de teclado para controle e entre dispositivos sem reiniciar. Perda de foco e desconexão cancelam a carga sem disparar.
+
+## Combate
+
+- **Corte básico:** 50 ms de antecipação, 110 ms de execução e 100 ms de recuperação: **260 ms**, contra 520 ms na 1.1. Dano base 34, custo de 8 de energia e buffer de 120 ms. Hitbox usa a região realmente varrida pela lâmina, com no máximo um acerto por alvo e golpe. Há hitstop curto, quantizado pelos passos físicos.
+- **Crimson Strike:** segure por pelo menos 200 ms. Carga limitada a 1.200 ms, espada progressivamente vermelha, partículas orbitais, pulsação, luz e halo GLSL. Soltar libera um arco carmesim, com dano até **85 (2,5×)**, custo proporcional até 38, knockback maior e recuperação mais longa. A duração do golpe liberado é 580 ms. Energia insuficiente limita a potência real; abaixo de 18, a carga não inicia. Soltar cedo cancela sem custo e informa o motivo. Pausa, perda de foco, dano, morte e desconexão cancelam com segurança.
+- **Phantom Dodge:** deslocamento contínuo por 300 ms, com colisões, inclinação e afterimages. Invulnerabilidade somente entre 55 e 215 ms, cooldown de 550 ms e custo de 18. Usa a direção de WASD/analógico ou a orientação atual se não houver direção. Pode cancelar carga e recuperação; não interrompe a execução ativa da espada. Não atravessa colunas nem a borda e não pode ser mantida infinitamente sem custo.
+
+Vida máxima 100, energia máxima 100 e regeneração de 15/s fora da carga. Corrida 4,6 unidades/s; movimento é reduzido durante corte e preparação pesada. A direção do golpe fica travada durante sua execução. Energia, cooldown e invulnerabilidade fazem parte da simulação, não da interface.
+
+## Inimigos e ondas
+
+| Arquétipo      | Vida | Comportamento e silhueta                                                                                                 |
+| -------------- | ---- | ------------------------------------------------------------------------------------------------------------------------ |
+| Sentinela      | 100  | Guerreiro original, espada vermelha, perseguição e preparação legível                                                    |
+| Crimson Raider | 76   | Silhueta estreita, crista e duas lâminas; perseguição rápida e combo de dois ataques                                     |
+| Void Archer    | 80   | Manto flutuante, fragmentos orbitais e arco geométrico; mantém distância e dispara projéteis precedidos por mira no chão |
+| Obsidian Brute | 260  | Corpo largo, placas de pedra, cristais e martelo; lento, golpe no chão e onda de choque, vulnerável na recuperação       |
+
+Dano aproximado por ataque: sentinela 14, raider 9, projétil 12, onda do brute 30. A armadura do brute reduz cortes comuns, mas sua recuperação aumenta o dano recebido. Ataques fortes interrompem archer e brute; cortes comuns interrompem sentinelas e raiders. Projéteis têm colisão varrida, expiração e bloqueio por obstáculos; a onda do brute também considera obstáculos entre origem e jogador.
+
+1. Três sentinelas e um raider.
+2. Duas sentinelas, dois raiders e um archer.
+3. Dois raiders, dois archers e um brute.
+4. Duas sentinelas, dois raiders, dois archers e um brute.
+
+São **21 inimigos** no total. Há três segundos entre ondas, com aviso e contagem no HUD. A próxima onda só começa após eliminar a anterior. Spawn evita o jogador, obstáculos e outros corpos, com breve sinalização. Limite simultâneo padrão **6**; acrescente `?enemyLimit=4` para outro limite entre 1 e 8. Inimigos excedentes aguardam uma vaga. A coordenação limita preparações/ataques simultâneos a dois e espaça novas iniciativas; os telegráficos continuam necessários para esquivar. Derrota e vitória permitem reiniciar a primeira onda com vida/energia restauradas.
+
+## Arquitetura e recursos
+
+- `src/main.ts`: integração do jogo, estados, HUD, câmera isométrica e áudio sintetizado.
+- `src/input.ts`: camada de entrada, Gamepad API e fila de eventos.
+- `src/actions.ts`: estado do jogador, carga, energia, esquiva, cooldown e invulnerabilidade.
+- `src/combat.ts`, `combat-effects.ts`, `spectral-effects.ts`: curvas do golpe, hitbox varrida, rastro da lâmina, flash, onda, halo e afterimages.
+- `src/enemies.ts`, `enemy-visuals.ts`, `waves.ts`: IA, arquétipos, pooling, projéteis, ondas e escolha de spawn.
+- `src/visuals.ts`: Kaeron articulado e templo procedural; `mechanics.ts` e `timing.ts`: colisões planares e simulação fixa de 60 Hz.
+
+A semente padrão é 7341; `?seed=1234` reproduz outra variação de detalhes. A arena navegável é projetada e os elementos superficiais são determinísticos. Sem modelos, imagens, fontes ou áudio externos obrigatórios. O projeto usa instancing no piso e projéteis, geometria imutável compartilhada, pool de 8 corpos, 24 projéteis, 4 ondas, 6 afterimages e 200 faíscas. A tomada de decisão da IA é espaçada; movimento e colisões continuam em passos fixos. Capa e materiais mutáveis não são compartilhados indevidamente.
+
+`?diagnostics=1` mostra FPS real, draw calls, inimigos ativos e tempo de atualização. A simulação recupera até 0,5 s por render; pausas descartam o tempo de suspensão. Esta entrega não comprova 60 FPS em GPU. Os testes disponíveis usam Linux/Chromium com renderização por software; Fedora KDE, Windows, hardware de controle e GPU física precisam de validação no PC de destino.
+
+## Testes e evidências
+
+Veja [o relatório 1.2](docs/1.2/TESTES.md), os JSONs em `docs/1.2/` e as capturas em [screenshots](docs/1.2/screenshots/). Os relatórios anteriores foram preservados.
+
+```fish
+npm test
+```
+
+Para os testes reais de navegador, instale Chromium (`sudo dnf install chromium`) e mantenha `npm run dev` em outro terminal:
+
+```fish
+npm run test:browser
+```
+
+Ou execute individualmente `npm run test:input`, `npm run test:movement`, `npm run test:controller`, `npm run test:combat`, `npm run test:ai`, `npm run test:waves` e `npm run test:dodge-visual`. Os runners aceitam `CHROMIUM_PATH` e `NEXUS_URL`. Para testar produção:
+
+```fish
+npm run build
+npm run preview -- --port 5181
+```
+
+Em outro terminal:
+
+```fish
+set -x NEXUS_URL 'http://127.0.0.1:5181/?test=1&diagnostics=1'
+npm run test:browser
+```
+
+`?test=1` habilita somente inspeção e preparação de cenários. Testes de ondas usam ataques, hitboxes, vida, dano e progressão reais; não forçam mortes. Os testes isolados de IA podem iniciar uma onda escolhida, sem fingir que isso valida progressão. Gamepads são simulados via `navigator.getGamepads()`. Capturas curtas de animação usam relógio controlado, documentado no relatório. Não equivalem a benchmark de hardware ou playtest humano de balanceamento.

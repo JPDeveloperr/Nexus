@@ -1,0 +1,11 @@
+{
+  "results": [
+    "basic press/release between rendered frames preserved",
+    "350ms charged press/release between frames preserves power",
+    "old keyboard release cannot fire gamepad charge",
+    "disconnect cancels charge"
+  ],
+  "errors": [],
+  "pollHz": 120,
+  "physicalGamepads": false
+}
