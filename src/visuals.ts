@@ -1,4 +1,5 @@
 import * as T from "three";
+import { cutPose, CUT } from "./combat";
 import { seededRandom, type Obstacle } from "./mechanics";
 
 const metal = new T.MeshStandardMaterial({
@@ -107,6 +108,11 @@ export class Warrior {
   rightArm = new T.Group();
   leftLeg = new T.Group();
   rightLeg = new T.Group();
+  leftForearm = new T.Group();
+  rightForearm = new T.Group();
+  sword = new T.Group();
+  private gait = 0;
+  private movementBlend = 0;
   blade: T.Mesh;
   cape: T.Mesh;
   aura: T.Mesh;
@@ -191,8 +197,11 @@ export class Warrior {
       );
       flange.rotation.z = -sign * 0.65;
       shell(limb, dark, 0.16, 0.13, 0.47, 0, -0.3, 0);
-      shell(limb, metal, 0.2, 0.13, 0.37, 0, -0.55, 0.015);
-      mesh(new T.SphereGeometry(0.13, 6, 5), edge, limb, 0, -0.77, 0.03);
+      const elbow = sign === 1 ? this.rightForearm : this.leftForearm;
+      limb.add(elbow);
+      elbow.position.y = -0.4;
+      shell(elbow, metal, 0.2, 0.13, 0.37, 0, -0.15, 0.015);
+      mesh(new T.SphereGeometry(0.13, 6, 5), edge, elbow, 0, -0.37, 0.03);
     }
     for (const [limb, sign] of [
       [this.leftLeg, -1],
@@ -207,9 +216,9 @@ export class Warrior {
       foot.scale.z = 1.25;
     }
     // Sword silhouette is an extruded, bevelled profile attached to the hand.
-    const sword = new T.Group();
-    this.rightArm.add(sword);
-    sword.position.set(0, -0.79, 0.05);
+    const sword = this.sword;
+    this.rightForearm.add(sword);
+    sword.position.set(0, -0.39, 0.05);
     sword.rotation.x = -Math.PI / 2;
     shell(sword, dark, 0.055, 0.055, 0.3, 0, -0.04, 0);
     box(sword, edge, 0, 0.13, 0, 0.58, 0.09, 0.14);
@@ -270,15 +279,33 @@ export class Warrior {
       0.025,
     );
   }
+  bladeSample() {
+    this.root.updateWorldMatrix(true, true);
+    return {
+      base: this.sword.localToWorld(new T.Vector3(0, 0.24, 0.025)),
+      tip: this.sword.localToWorld(new T.Vector3(0, 1.62, 0.025)),
+    };
+  }
   animate(
     t: number,
     speed: number,
     attack: number,
     hurt: number,
     dead = false,
+    dt = 1 / 60,
   ) {
-    const stride = Math.sin(t * 10),
-      run = Math.min(1, speed / 4.5);
+    this.gait += speed * dt * 2.5;
+    this.movementBlend +=
+      (Math.min(1, speed / 4.5) - this.movementBlend) *
+      (1 - Math.exp(-15 * dt));
+    const stride = this.corrupted ? Math.sin(t * 10) : Math.sin(this.gait),
+      run = this.corrupted ? Math.min(1, speed / 4.5) : this.movementBlend;
+    this.leftArm.rotation.set(0, 0, 0);
+    this.rightArm.rotation.set(0, 0, 0);
+    this.leftForearm.rotation.set(0, 0, 0);
+    this.rightForearm.rotation.set(0, 0, 0);
+    this.sword.rotation.set(-Math.PI / 2, 0, 0);
+    this.torso.rotation.x = -run * 0.07;
     this.torso.position.y =
       1.35 + Math.sin(t * 2) * 0.018 + Math.abs(stride) * 0.045 * run;
     this.leftLeg.rotation.x = stride * 0.65 * run;
@@ -287,12 +314,77 @@ export class Warrior {
     this.rightArm.rotation.x = stride * 0.38 * run - 0.18;
     this.rightArm.rotation.z = -0.08;
     this.torso.rotation.y = 0;
-    if (attack > 0) {
+    if (attack > 0 && this.corrupted) {
       const p = attack / 0.52;
       this.torso.rotation.y = Math.sin(p * Math.PI * 2) * 0.65;
       this.rightArm.rotation.x = -1.3 - Math.sin(p * Math.PI) * 0.5;
       this.rightArm.rotation.z = -0.8 + Math.sin(p * Math.PI * 1.7) * 1.7;
     }
+    if (!this.corrupted && attack > 0) {
+      const pose = cutPose(CUT.duration - attack),
+        blend = pose.blend;
+      this.torso.rotation.y = pose.torso;
+      this.rightArm.rotation.x = T.MathUtils.lerp(
+        this.rightArm.rotation.x,
+        -1.25,
+        blend,
+      );
+      this.rightArm.rotation.z = T.MathUtils.lerp(-0.08, -0.72, blend);
+      this.rightForearm.rotation.x = -0.45 * blend;
+      this.root.updateWorldMatrix(true, true);
+      const desired = new T.Vector3(
+        Math.sin(pose.sweep),
+        0.06,
+        Math.cos(pose.sweep),
+      ).normalize();
+      const rootQ = this.root.getWorldQuaternion(new T.Quaternion());
+      const worldQ = rootQ.multiply(
+        new T.Quaternion().setFromUnitVectors(new T.Vector3(0, 1, 0), desired),
+      );
+      const localQ = this.rightForearm
+        .getWorldQuaternion(new T.Quaternion())
+        .invert()
+        .multiply(worldQ);
+      this.sword.quaternion.slerp(localQ, blend);
+      this.root.updateWorldMatrix(true, true);
+      // Two-link support arm IK: shoulder and elbow follow the actual sword grip.
+      const grip = this.torso.worldToLocal(
+        this.sword.localToWorld(new T.Vector3(0, -0.02, 0)),
+      );
+      const shoulder = this.leftArm.position.clone(),
+        toGrip = grip.sub(shoulder);
+      const distance = Math.min(0.765, Math.max(0.05, toGrip.length())),
+        direction = toGrip.normalize();
+      const along =
+        (0.4 * 0.4 - 0.39 * 0.39 + distance * distance) / (2 * distance);
+      const pole = new T.Vector3(-1, -0.2, 0.5);
+      pole.addScaledVector(direction, -pole.dot(direction)).normalize();
+      const elbow = direction
+        .clone()
+        .multiplyScalar(along)
+        .addScaledVector(
+          pole,
+          Math.sqrt(Math.max(0, 0.4 * 0.4 - along * along)),
+        );
+      const upperQ = new T.Quaternion().setFromUnitVectors(
+        new T.Vector3(0, -1, 0),
+        elbow.clone().normalize(),
+      );
+      this.leftArm.quaternion.slerp(upperQ, blend);
+      const lower = direction
+        .multiplyScalar(distance)
+        .sub(elbow)
+        .normalize()
+        .applyQuaternion(this.leftArm.quaternion.clone().invert());
+      this.leftForearm.quaternion.slerp(
+        new T.Quaternion().setFromUnitVectors(new T.Vector3(0, -1, 0), lower),
+        blend,
+      );
+    }
+    (this.blade.material as T.MeshStandardMaterial).emissiveIntensity =
+      !this.corrupted && attack > 0
+        ? 0.6 + cutPose(CUT.duration - attack).blend * 1.8
+        : 0.6;
     this.torso.rotation.z = hurt > 0 ? Math.sin(hurt * 35) * 0.14 : 0;
     this.root.rotation.z = dead
       ? Math.min(1.4, this.root.rotation.z + 0.05)

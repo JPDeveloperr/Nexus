@@ -14,6 +14,8 @@ import {
 import "./style.css";
 import { InputSystem } from "./input";
 import { FixedStepClock } from "./timing";
+import { CUT, cutPose, sweptBladeHits } from "./combat";
+import { CombatEffects } from "./combat-effects";
 
 type Mode = "menu" | "playing" | "paused" | "defeat" | "victory";
 type EnemyState =
@@ -175,20 +177,7 @@ const sparks = Array.from({ length: particleCount }, () => ({
 }));
 let particleIndex = 0;
 positions.fill(-999);
-const slash = mesh(
-  new T.RingGeometry(1, 2.7, 40, 1, 0.1, 2.2),
-  new T.MeshBasicMaterial({
-    color: 0x83ffff,
-    side: T.DoubleSide,
-    transparent: true,
-    opacity: 0,
-    depthWrite: false,
-    blending: T.AdditiveBlending,
-  }),
-  scene,
-);
-slash.rotation.x = -Math.PI / 2;
-slash.visible = false;
+const effects = new CombatEffects(scene);
 const clock = new FixedStepClock();
 const input = new InputSystem(renderer.domElement, () => mode === "playing");
 let controls = input.read();
@@ -203,11 +192,22 @@ let mode: Mode = "menu",
   health = 100,
   energy = 100,
   attack = 0,
-  attackHit = false,
   hurt = 0,
   shake = 0,
   time = 0,
   kills = 0;
+let attackBuffered = 0,
+  hitstop = 0,
+  attackSequence = 0;
+const hitTargets = new Set<number>();
+let previousBlade = player.bladeSample();
+const combatEvents: Record<string, unknown>[] = [];
+function recordCombat(event: Record<string, unknown>) {
+  if (params.has("test")) {
+    combatEvents.push({ ...event, time, sequence: attackSequence });
+    if (combatEvents.length > 100) combatEvents.shift();
+  }
+}
 let toastTimer = 0;
 let audio: AudioContext | undefined;
 function sound(frequency: number, duration: number, volume = 0.025) {
@@ -259,7 +259,7 @@ function setMode(next: Mode) {
     "hidden",
     next === "menu" || next === "playing",
   );
-  if(next === "playing") renderer.domElement.focus({preventScroll:true});
+  if (next === "playing") renderer.domElement.focus({ preventScroll: true });
   if (next === "paused" || next === "defeat" || next === "victory") {
     $("#dialog-kicker").textContent =
       next === "paused"
@@ -291,6 +291,10 @@ function reset() {
   hurt = 0;
   shake = 0;
   kills = 0;
+  attackBuffered = 0;
+  hitstop = 0;
+  hitTargets.clear();
+  effects.reset();
   player.root.position.set(0, 0, 5);
   player.root.rotation.set(0, Math.PI, 0);
   cameraTarget.set(0, 0, -1);
@@ -320,23 +324,45 @@ function updateHUD() {
   $("#cooldown").style.transform = `scaleX(${attack / ATTACK.duration})`;
 }
 function startAttack() {
-  if (mode !== "playing" || attack > 0 || hurt > 0.22) return;
+  if (mode !== "playing") return;
   if (energy < ATTACK.cost) {
     notify("A energia precisa se recompor");
     return;
   }
-  if (mouseAiming)
+  attackBuffered = CUT.buffer;
+}
+function beginAttack() {
+  attackBuffered = 0;
+  attack = ATTACK.duration;
+  hitTargets.clear();
+  attackSequence++;
+  if (controls.aim) {
+    const world = new T.Vector3(cameraOffset.z, 0, -cameraOffset.x)
+      .normalize()
+      .multiplyScalar(controls.aim.x)
+      .add(
+        new T.Vector3(-cameraOffset.x, 0, -cameraOffset.z)
+          .normalize()
+          .multiplyScalar(-controls.aim.y),
+      );
+    player.root.rotation.y = Math.atan2(world.x, world.z);
+  } else if (mouseAiming)
     player.root.rotation.y = Math.atan2(
       aim.x - player.root.position.x,
       aim.z - player.root.position.z,
     );
-  attack = ATTACK.duration;
-  attackHit = false;
   energy -= ATTACK.cost;
+  previousBlade = player.bladeSample();
   sound(260, 0.16, 0.015);
+  recordCombat({ kind: "start" });
 }
 $("#start").onclick = () => {
-  try { audio ??= new AudioContext(); void audio.resume().catch(()=>{}); } catch { /* Audio must never block play. */ }
+  try {
+    audio ??= new AudioContext();
+    void audio.resume().catch(() => {});
+  } catch {
+    /* Audio must never block play. */
+  }
   reset();
 };
 $("#resume").onclick = () => (mode === "paused" ? setMode("playing") : reset());
@@ -346,8 +372,12 @@ $("#pause").onclick = () => {
   else if (mode === "paused") setMode("playing");
 };
 $("#attack-button").onclick = startAttack;
-window.addEventListener("blur", () => { if(mode === "playing") setMode("paused"); });
-document.addEventListener("visibilitychange", () => { if(document.hidden && mode === "playing") setMode("paused"); });
+window.addEventListener("blur", () => {
+  if (mode === "playing") setMode("paused");
+});
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden && mode === "playing") setMode("paused");
+});
 function applyQuality(value: string) {
   const high = value === "high",
     low = value === "low";
@@ -357,28 +387,82 @@ function applyQuality(value: string) {
   bloom.strength = high ? 0.55 : 0.42;
   resize();
 }
-const deadzoneSlider=$<HTMLInputElement>('#deadzone');deadzoneSlider.value=String(input.deadzone);
-$('#deadzone-value').textContent=Math.round(input.deadzone*100)+'%';
-deadzoneSlider.oninput=()=>{input.saveDeadzone(Number(deadzoneSlider.value));$('#deadzone-value').textContent=Math.round(input.deadzone*100)+'%';};
-$('#gamepad-select').onchange=e=>{const value=(e.target as HTMLSelectElement).value;input.selectGamepad(value==='auto'?null:Number(value));};
-let padListSignature='';
-function updateInputUI(){
- const pads=input.available(),signature=pads.map(p=>p.index+':'+p.id+':'+p.mapping).join('|');
- if(signature!==padListSignature){padListSignature=signature;const select=$<HTMLSelectElement>('#gamepad-select');select.replaceChildren(new Option('Automático','auto'));for(const p of pads){const option=new Option(`${p.index+1}: ${p.id.slice(0,45)}`,String(p.index));option.disabled=p.mapping!=='standard';select.add(option);}}
- $('#input-status').textContent=controls.unsupported?'Mapeamento não padrão · use teclado ou um controle padrão':controls.source==='gamepad'?`CONTROLE ${Number(controls.gamepad)+1} · X / □ ATACAR · MENU PAUSAR`:`TECLADO / MOUSE${controls.pads?' · CONTROLE CONECTADO':''}`;
+const deadzoneSlider = $<HTMLInputElement>("#deadzone");
+deadzoneSlider.value = String(input.deadzone);
+$("#deadzone-value").textContent = Math.round(input.deadzone * 100) + "%";
+deadzoneSlider.oninput = () => {
+  input.saveDeadzone(Number(deadzoneSlider.value));
+  $("#deadzone-value").textContent = Math.round(input.deadzone * 100) + "%";
+};
+$("#gamepad-select").onchange = (e) => {
+  const value = (e.target as HTMLSelectElement).value;
+  input.selectGamepad(value === "auto" ? null : Number(value));
+};
+let padListSignature = "";
+function updateInputUI() {
+  const pads = input.available(),
+    signature = pads
+      .map((p) => p.index + ":" + p.id + ":" + p.mapping)
+      .join("|");
+  if (signature !== padListSignature) {
+    padListSignature = signature;
+    const select = $<HTMLSelectElement>("#gamepad-select");
+    select.replaceChildren(new Option("Automático", "auto"));
+    for (const p of pads) {
+      const option = new Option(
+        `${p.index + 1}: ${p.id.slice(0, 45)}`,
+        String(p.index),
+      );
+      option.disabled = p.mapping !== "standard";
+      select.add(option);
+    }
+  }
+  $("#input-status").textContent = controls.unsupported
+    ? "Mapeamento não padrão · use teclado ou um controle padrão"
+    : controls.source === "gamepad"
+      ? `CONTROLE ${Number(controls.gamepad) + 1} · X / □ ATACAR · MENU PAUSAR`
+      : `TECLADO / MOUSE${controls.pads ? " · CONTROLE CONECTADO" : ""}`;
 }
-function handleMenuInput(){
- if(mode==='playing')return;
- const candidates=mode==='menu'?['#start','#quality','#deadzone','#gamepad-select']:['#resume','#menu-button'];
- const elements=candidates.map(s=>$(s));let index=elements.indexOf(document.activeElement as HTMLElement);
- if(controls.navigate){
-  const focused=elements[index];
-  if(focused instanceof HTMLSelectElement){focused.selectedIndex=Math.max(0,Math.min(focused.options.length-1,focused.selectedIndex+controls.navigate));focused.dispatchEvent(new Event('change'));}
-  else if(focused instanceof HTMLInputElement){focused.value=String(Math.max(.05,Math.min(.4,Number(focused.value)+controls.navigate*.01)));focused.dispatchEvent(new Event('input'));}
-  else {index=(index+controls.navigate+elements.length)%elements.length;elements[index].focus();}
- }
- if(controls.confirm){if(index<0)index=0;const selected=elements[index];if(selected instanceof HTMLButtonElement)selected.click();else elements[(index+1)%elements.length].focus();}
- if(controls.back&&mode==='paused')setMode('playing');else if(controls.back&&mode!=='menu')setMode('menu');
+function handleMenuInput() {
+  if (mode === "playing") return;
+  const candidates =
+    mode === "menu"
+      ? ["#start", "#quality", "#deadzone", "#gamepad-select"]
+      : ["#resume", "#menu-button"];
+  const elements = candidates.map((s) => $(s));
+  let index = elements.indexOf(document.activeElement as HTMLElement);
+  if (controls.navigate) {
+    const focused = elements[index];
+    if (focused instanceof HTMLSelectElement) {
+      focused.selectedIndex = Math.max(
+        0,
+        Math.min(
+          focused.options.length - 1,
+          focused.selectedIndex + controls.navigate,
+        ),
+      );
+      focused.dispatchEvent(new Event("change"));
+    } else if (focused instanceof HTMLInputElement) {
+      focused.value = String(
+        Math.max(
+          0.05,
+          Math.min(0.4, Number(focused.value) + controls.navigate * 0.01),
+        ),
+      );
+      focused.dispatchEvent(new Event("input"));
+    } else {
+      index = (index + controls.navigate + elements.length) % elements.length;
+      elements[index].focus();
+    }
+  }
+  if (controls.confirm) {
+    if (index < 0) index = 0;
+    const selected = elements[index];
+    if (selected instanceof HTMLButtonElement) selected.click();
+    else elements[(index + 1) % elements.length].focus();
+  }
+  if (controls.back && mode === "paused") setMode("playing");
+  else if (controls.back && mode !== "menu") setMode("menu");
 }
 $("#quality").onchange = (e) =>
   applyQuality((e.target as HTMLSelectElement).value);
@@ -518,12 +602,25 @@ function updateEnemy(e: Enemy, dt: number) {
     speed = s;
   }
 }
-function simulate(dt:number) {
+function simulate(dt: number) {
+  if (mode === "playing" && hitstop > 0) {
+    hitstop = Math.max(0, hitstop - dt);
+    return;
+  }
   if (mode === "playing" || mode === "menu") time += dt;
   if (mode === "playing") {
     ray.setFromCamera(pointer, camera);
     ray.ray.intersectPlane(plane, aim);
-    const dx=controls.move.x, dz=controls.move.y;
+    if (
+      attack === 0 &&
+      attackBuffered > 0 &&
+      hurt <= 0.22 &&
+      energy >= ATTACK.cost
+    )
+      beginAttack();
+    attackBuffered = Math.max(0, attackBuffered - dt);
+    const dx = controls.move.x,
+      dz = controls.move.y;
     // Project keyboard axes onto the isometric ground plane: W always moves up-screen.
     const forward = new T.Vector3(
         -cameraOffset.x,
@@ -543,9 +640,12 @@ function simulate(dt:number) {
           radius: 0.5,
         })),
     );
-    const smoothing=1-Math.exp(-14*dt);
-    velocity.lerp(new T.Vector2(direction.x*speed,direction.z*speed),smoothing);
-    const before=player.root.position.clone();
+    const smoothing = 1 - Math.exp(-14 * dt);
+    velocity.lerp(
+      new T.Vector2(direction.x * speed, direction.z * speed),
+      smoothing,
+    );
+    const before = player.root.position.clone();
     const next = moveCircle(
       player.root.position,
       { x: velocity.x * dt, z: velocity.y * dt },
@@ -554,10 +654,24 @@ function simulate(dt:number) {
     );
     player.root.position.x = next.x;
     player.root.position.z = next.z;
-    actualSpeed=Math.hypot(next.x-before.x,next.z-before.z)/dt;
+    actualSpeed = Math.hypot(next.x - before.x, next.z - before.z) / dt;
     if (attack === 0) {
-      if(controls.aim){const aimWorld=new T.Vector3(cameraOffset.z,0,-cameraOffset.x).normalize().multiplyScalar(controls.aim.x).add(new T.Vector3(-cameraOffset.x,0,-cameraOffset.z).normalize().multiplyScalar(-controls.aim.y));player.root.rotation.y=dampAngle(player.root.rotation.y,Math.atan2(aimWorld.x,aimWorld.z),18,dt);}
-      else if (mouseAiming)
+      if (controls.aim) {
+        const aimWorld = new T.Vector3(cameraOffset.z, 0, -cameraOffset.x)
+          .normalize()
+          .multiplyScalar(controls.aim.x)
+          .add(
+            new T.Vector3(-cameraOffset.x, 0, -cameraOffset.z)
+              .normalize()
+              .multiplyScalar(-controls.aim.y),
+          );
+        player.root.rotation.y = dampAngle(
+          player.root.rotation.y,
+          Math.atan2(aimWorld.x, aimWorld.z),
+          18,
+          dt,
+        );
+      } else if (mouseAiming)
         player.root.rotation.y = dampAngle(
           player.root.rotation.y,
           Math.atan2(aim.x - next.x, aim.z - next.z),
@@ -573,18 +687,40 @@ function simulate(dt:number) {
         );
     }
     if (attack > 0) {
-      const elapsed = ATTACK.duration - attack;
-      if (elapsed >= ATTACK.impact && !attackHit) {
-        attackHit = true;
+      const previousElapsed = ATTACK.duration - attack;
+      const remaining = Math.max(0, attack - dt),
+        elapsed = ATTACK.duration - remaining;
+      player.animate(
+        time,
+        actualSpeed,
+        Math.max(0.000001, remaining),
+        hurt,
+        false,
+        dt,
+      );
+      const blade = player.bladeSample();
+      const active = elapsed >= CUT.windup && elapsed <= CUT.activeEnd;
+      if (active) {
+        effects.sample(blade.base, blade.tip, time);
         for (const e of enemies)
           if (
             e.state !== "dead" &&
-            insideStrike(
-              player.root.position,
-              player.root.rotation.y,
-              e.body.root.position,
-            )
+            !hitTargets.has(e.id) &&
+            player.root.position.distanceTo(e.body.root.position) <=
+              ATTACK.reach &&
+            sweptBladeHits(previousBlade, blade, e.body.root.position)
           ) {
+            hitTargets.add(e.id);
+            effects.impact(e.body.root.position);
+            hitstop = CUT.hitstop;
+            recordCombat({
+              kind: "hit",
+              elapsed,
+              phase: cutPose(elapsed).phase,
+              target: e.id,
+              base: blade.base.toArray(),
+              tip: blade.tip.toArray(),
+            });
             e.hp = Math.max(0, e.hp - ATTACK.damage);
             e.hurt = 0.35;
             e.timer = 0;
@@ -612,17 +748,12 @@ function simulate(dt:number) {
           }
         if (kills === 3) setMode("victory");
       }
-      slash.visible = elapsed > 0.12 && elapsed < 0.37;
-      slash.position.copy(player.root.position);
-      slash.position.y = 0.9;
-      slash.rotation.z = -player.root.rotation.y + elapsed * 8;
-      (slash.material as T.MeshBasicMaterial).opacity =
-        Math.max(0, Math.sin(((elapsed - 0.12) / 0.25) * Math.PI)) * 0.65;
-      attack = Math.max(0, attack - dt);
-    } else slash.visible = false;
+      previousBlade = blade;
+      attack = remaining;
+      if (remaining === 0) recordCombat({ kind: "end" });
+    } else player.animate(time, actualSpeed, 0, hurt, false, dt);
     hurt = Math.max(0, hurt - dt);
     energy = Math.min(100, energy + dt * 15);
-    player.animate(time, actualSpeed, attack, hurt);
     for (const e of enemies) {
       if (mode !== "playing") break;
       updateEnemy(e, dt);
@@ -635,22 +766,29 @@ function simulate(dt:number) {
     player.animate(time, 0, 0, 0);
     enemies.forEach((e) => e.body.animate(time + e.id, 0, 0, 0));
     cameraTarget.lerp(new T.Vector3(-2, 0, -1.5), 0.02);
-    slash.visible = false;
+    effects.reset();
   }
 }
-let previous=performance.now();
-let frameTimes:number[]=[];
-let metricsTimer=0;
-function frame(now:number) {
+let previous = performance.now();
+let frameTimes: number[] = [];
+let metricsTimer = 0;
+function frame(now: number) {
   requestAnimationFrame(frame);
-  const frameMs=Math.max(0,now-previous);previous=now;
-  const dt=Math.min(frameMs/1000,.5);
-  controls=input.read();
-  pointer.set(controls.pointer.x,controls.pointer.y);mouseAiming=controls.mouseAim;
-  if(controls.pause){if(mode==='playing')setMode('paused');else if(mode==='paused')setMode('playing');}
-  handleMenuInput();updateInputUI();
-  if(controls.attack)startAttack();
-  if(mode==='playing'||mode==='menu')clock.advance(dt,simulate);else clock.reset();
+  const frameMs = Math.max(0, now - previous);
+  previous = now;
+  const dt = Math.min(frameMs / 1000, 0.5);
+  controls = input.read();
+  pointer.set(controls.pointer.x, controls.pointer.y);
+  mouseAiming = controls.mouseAim;
+  if (controls.pause) {
+    if (mode === "playing") setMode("paused");
+    else if (mode === "paused") setMode("playing");
+  }
+  handleMenuInput();
+  updateInputUI();
+  if (controls.attack) startAttack();
+  if (mode === "playing" || mode === "menu") clock.advance(dt, simulate);
+  else clock.reset();
   if (mode === "playing" || mode === "menu") temple.update(time);
   for (let i = 0; i < particleCount; i++) {
     const s = sparks[i];
@@ -675,6 +813,7 @@ function frame(now:number) {
   camera.lookAt(cameraTarget);
   camera.updateMatrixWorld();
   $("#damage-flash").style.opacity = String(hurt * 0.5);
+  effects.update(time, mode === "playing" ? dt : 0);
   renderer.info.reset();
   composer.render();
   if (frameMs > 0) frameTimes.push(frameMs);
@@ -698,7 +837,17 @@ if (params.has("test")) {
         energy,
         kills,
         attack,
-        actualSpeed, velocity:velocity.toArray(), input:controls, focus:document.activeElement?.tagName,
+        attackBuffered,
+        hitstop,
+        attackSequence,
+        combatEvents: combatEvents.slice(),
+        blade: player.bladeSample(),
+        animationPhase:
+          attack > 0 ? cutPose(ATTACK.duration - attack).phase : "idle",
+        actualSpeed,
+        velocity: velocity.toArray(),
+        input: controls,
+        focus: document.activeElement?.tagName,
         player: {
           x: player.root.position.x,
           z: player.root.position.z,
@@ -724,10 +873,12 @@ if (params.has("test")) {
           PLAYER_RADIUS,
           temple.obstacles,
         );
-        player.root.position.set(p.x, 0, p.z); velocity.set(0,0);
+        player.root.position.set(p.x, 0, p.z);
+        velocity.set(0, 0);
       },
       face: (a: number) => {
-        mouseAiming = false; input.clearAim();
+        mouseAiming = false;
+        input.clearAim();
         player.root.rotation.y = a;
       },
       inspect: (zoom: number) => {

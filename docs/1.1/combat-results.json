@@ -1,0 +1,380 @@
+{
+  "results": [
+    "Anticipation has no damage",
+    "Real blade sweep hits once, exclusively during execution",
+    "Blade trajectory changes and remains attached to the articulated hand",
+    "Late input is buffered into one next attack",
+    "Running into attack, locked facing, then back to movement"
+  ],
+  "errors": [],
+  "clock": "Controlled requestAnimationFrame at 60Hz; real rendering, input, animation and damage code",
+  "hitEvents": [
+    {
+      "kind": "start",
+      "time": 0.19999999999999998,
+      "sequence": 1
+    },
+    {
+      "kind": "hit",
+      "elapsed": 0.25,
+      "phase": "execution",
+      "target": 0,
+      "base": [
+        0.15022889927454863,
+        1.5554141501572825,
+        4.186055665014475
+      ],
+      "tip": [
+        0.6185657933063944,
+        1.6380655113618492,
+        2.890590765382054
+      ],
+      "time": 0.4333333333333333,
+      "sequence": 1
+    }
+  ],
+  "poses": {
+    "initial": {
+      "mode": "playing",
+      "time": 0.18333333333333332,
+      "health": 100,
+      "energy": 100,
+      "kills": 0,
+      "attack": 0,
+      "attackBuffered": 0,
+      "hitstop": 0,
+      "attackSequence": 0,
+      "combatEvents": [],
+      "blade": {
+        "base": {
+          "x": -0.4588652591135829,
+          "y": 0.7422042232705124,
+          "z": 5.050410708663582
+        },
+        "tip": {
+          "x": -0.45886525911358306,
+          "y": 0.49514341194287526,
+          "z": 6.40811500471119
+        }
+      },
+      "animationPhase": "idle",
+      "actualSpeed": 0,
+      "velocity": [
+        0,
+        0
+      ],
+      "input": {
+        "move": {
+          "x": 0,
+          "y": 0
+        },
+        "aim": null,
+        "pointer": {
+          "x": 0,
+          "y": 0
+        },
+        "mouseAim": false,
+        "attack": false,
+        "pause": false,
+        "confirm": false,
+        "back": false,
+        "navigate": 0,
+        "source": "keyboard",
+        "gamepad": null,
+        "pads": 0,
+        "unsupported": 0
+      },
+      "focus": "CANVAS",
+      "player": {
+        "x": 0,
+        "z": 5,
+        "facing": 3.141592653589793
+      },
+      "enemies": [
+        {
+          "hp": 100,
+          "state": "windup",
+          "timer": 0.15,
+          "x": 0,
+          "z": 3
+        },
+        {
+          "hp": 100,
+          "state": "patrol",
+          "timer": 0.18333333333333332,
+          "x": 5.306889010971305,
+          "z": -5.935202835454119
+        },
+        {
+          "hp": 100,
+          "state": "patrol",
+          "timer": 0.18333333333333332,
+          "x": -5.081796254860076,
+          "z": -6.0581715685634885
+        }
+      ],
+      "camera": [
+        21,
+        26,
+        29.48650771806244
+      ],
+      "calls": 342,
+      "triangles": 17297,
+      "frames": [
+        184.66666666666663
+      ],
+      "geometries": 341
+    },
+    "active": {
+      "mode": "playing",
+      "time": 0.41666666666666663,
+      "health": 100,
+      "energy": 85.5,
+      "kills": 0,
+      "attack": 0.2866666666666667,
+      "attackBuffered": 0,
+      "hitstop": 0,
+      "attackSequence": 1,
+      "combatEvents": [
+        {
+          "kind": "start",
+          "time": 0.19999999999999998,
+          "sequence": 1
+        }
+      ],
+      "blade": {
+        "base": {
+          "x": 0.2521116082665989,
+          "y": 1.5570776925808263,
+          "z": 4.2140970648180724
+        },
+        "tip": {
+          "x": 0.9599007201701126,
+          "y": 1.6397290537853928,
+          "z": 3.0323173367968694
+        }
+      },
+      "animationPhase": "execution",
+      "actualSpeed": 0,
+      "velocity": [
+        0,
+        0
+      ],
+      "input": {
+        "move": {
+          "x": 0,
+          "y": 0
+        },
+        "aim": null,
+        "pointer": {
+          "x": 0,
+          "y": 0
+        },
+        "mouseAim": false,
+        "attack": false,
+        "pause": false,
+        "confirm": false,
+        "back": false,
+        "navigate": 0,
+        "source": "keyboard",
+        "gamepad": null,
+        "pads": 0,
+        "unsupported": 0
+      },
+      "focus": "CANVAS",
+      "player": {
+        "x": 0,
+        "z": 5,
+        "facing": 3.141592653589793
+      },
+      "enemies": [
+        {
+          "hp": 100,
+          "state": "windup",
+          "timer": 0.3833333333333333,
+          "x": 0,
+          "z": 3
+        },
+        {
+          "hp": 100,
+          "state": "patrol",
+          "timer": 0.41666666666666663,
+          "x": 5.454945189694542,
+          "z": -5.866436546003076
+        },
+        {
+          "hp": 100,
+          "state": "patrol",
+          "timer": 0.41666666666666663,
+          "x": -4.943936322791932,
+          "z": -6.145601962324232
+        }
+      ],
+      "camera": [
+        21,
+        26.39726824303313,
+        32.558438723388335
+      ],
+      "calls": 173,
+      "triangles": 14551,
+      "frames": [
+        184.66666666666663,
+        16.66666666666663,
+        16.66666666666663,
+        16.66666666666663,
+        16.66666666666663,
+        16.66666666666663,
+        16.66666666666663,
+        16.66666666666663,
+        16.66666666666663,
+        16.66666666666663,
+        16.66666666666663,
+        16.66666666666663,
+        16.66666666666663,
+        16.66666666666663,
+        16.66666666666663
+      ],
+      "geometries": 341
+    },
+    "recovery": {
+      "mode": "playing",
+      "time": 0.55,
+      "health": 100,
+      "energy": 87.5,
+      "kills": 0,
+      "attack": 0.15333333333333338,
+      "attackBuffered": 0,
+      "hitstop": 0,
+      "attackSequence": 1,
+      "combatEvents": [
+        {
+          "kind": "start",
+          "time": 0.19999999999999998,
+          "sequence": 1
+        },
+        {
+          "kind": "hit",
+          "elapsed": 0.25,
+          "phase": "execution",
+          "target": 0,
+          "base": [
+            0.15022889927454863,
+            1.5554141501572825,
+            4.186055665014475
+          ],
+          "tip": [
+            0.6185657933063944,
+            1.6380655113618492,
+            2.890590765382054
+          ],
+          "time": 0.4333333333333333,
+          "sequence": 1
+        }
+      ],
+      "blade": {
+        "base": {
+          "x": -0.5897640672315808,
+          "y": 1.504505487546258,
+          "z": 4.394899184020328
+        },
+        "tip": {
+          "x": -1.7765257569764072,
+          "y": 1.5263119378247723,
+          "z": 3.690966537753475
+        }
+      },
+      "animationPhase": "recovery",
+      "actualSpeed": 0,
+      "velocity": [
+        0,
+        0
+      ],
+      "input": {
+        "move": {
+          "x": 0,
+          "y": 0
+        },
+        "aim": null,
+        "pointer": {
+          "x": 0,
+          "y": 0
+        },
+        "mouseAim": false,
+        "attack": false,
+        "pause": false,
+        "confirm": false,
+        "back": false,
+        "navigate": 0,
+        "source": "keyboard",
+        "gamepad": null,
+        "pads": 0,
+        "unsupported": 0
+      },
+      "focus": "CANVAS",
+      "player": {
+        "x": 0,
+        "z": 5,
+        "facing": 3.141592653589793
+      },
+      "enemies": [
+        {
+          "hp": 66,
+          "state": "hurt",
+          "timer": 0.13333333333333333,
+          "x": 0,
+          "z": 2.5
+        },
+        {
+          "hp": 100,
+          "state": "patrol",
+          "timer": 0.55,
+          "x": 5.5429086979746645,
+          "z": -5.835297930614053
+        },
+        {
+          "hp": 100,
+          "state": "patrol",
+          "timer": 0.55,
+          "x": -4.870207195078977,
+          "z": -6.202796436567635
+        }
+      ],
+      "camera": [
+        21,
+        26.266296866958463,
+        31.764424755935686
+      ],
+      "calls": 192,
+      "triangles": 14781,
+      "frames": [
+        184.66666666666663,
+        16.66666666666663,
+        16.66666666666663,
+        16.66666666666663,
+        16.66666666666663,
+        16.66666666666663,
+        16.66666666666663,
+        16.66666666666663,
+        16.66666666666663,
+        16.66666666666663,
+        16.66666666666663,
+        16.66666666666663,
+        16.66666666666663,
+        16.66666666666663,
+        16.66666666666663,
+        16.66666666666663,
+        16.66666666666663,
+        16.66666666666663,
+        16.66666666666663,
+        16.66666666666663,
+        16.66666666666663,
+        16.66666666666663,
+        16.66666666666663,
+        16.66666666666663,
+        16.66666666666663,
+        16.66666666666663
+      ],
+      "geometries": 343
+    }
+  }
+}
