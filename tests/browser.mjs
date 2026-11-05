@@ -13,6 +13,7 @@ const browser = await chromium.launch({
   ],
 });
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+const output = process.env.NEXUS_TEST_OUTPUT || "docs/1.1/regression";
 const errors = [],
   results = [];
 page.on("pageerror", (e) => errors.push(e.message));
@@ -38,7 +39,7 @@ async function pass(name, fn) {
   results.push(name);
   console.log("PASS", name);
 }
-await mkdir("docs/screenshots", { recursive: true });
+await mkdir(`${output}/screenshots`, { recursive: true });
 try {
   await page.goto(process.env.NEXUS_URL || "http://127.0.0.1:5173/?test=1");
   await page.waitForFunction(
@@ -51,7 +52,7 @@ try {
     assert.ok(s.triangles > 1000);
     assert.equal(s.mode, "menu");
   });
-  await page.screenshot({ path: "docs/screenshots/01-menu.png" });
+  await page.screenshot({ path: `${output}/screenshots/01-menu.png` });
   await page.setViewportSize({ width: 960, height: 600 });
   await page.selectOption("#quality", "low");
   await page.click("#start");
@@ -81,14 +82,33 @@ try {
     const s = await snapshot(),
       e = s.enemies[0];
     await page.evaluate((e) => window.__nexus.place(e.x, e.z + 2.4), e);
+    // Teleport is test setup only: let the follow camera settle before projecting a mouse target.
+    await simWait(1);
+    // Do not request a cut while Kaeron is legitimately stunned by the sentinel.
+    await page.waitForFunction(
+      () => {
+        const e = window.__nexus.snapshot().enemies[0];
+        return e.state === "recover" && e.timer > 0.35 && e.timer < 0.75;
+      },
+      null,
+      { timeout: 10000 },
+    );
+    const current = (await snapshot()).enemies[0];
     const point = await page.evaluate(
       (e) => window.__nexus.project(e.x, 0, e.z),
-      e,
+      current,
     );
     await page.mouse.move(point.x, point.y);
-    await simWait(0.1);
+    const sequence = (await snapshot()).attackSequence;
     await page.mouse.click(point.x, point.y);
-    await simWait(0.4);
+    await page.waitForFunction(
+      (sequence) => {
+        const s = window.__nexus.snapshot();
+        return s.attackSequence > sequence && s.attack === 0;
+      },
+      sequence,
+      { timeout: 10000 },
+    );
     const b = await snapshot();
     assert.ok(b.enemies[0].hp < 100);
     assert.ok(b.energy < 100);
@@ -115,9 +135,12 @@ try {
   // Restore an overview camera position through gameplay, not a fabricated render.
   await page.evaluate(() => window.__nexus.place(0, 4));
   await simWait(0.7);
-  await page.screenshot({ path: "docs/screenshots/02-gameplay.png" });
+  await page.screenshot({ path: `${output}/screenshots/02-gameplay.png` });
   await pass("Pause freezes simulation and resumes", async () => {
     await page.keyboard.press("Escape");
+    await page.waitForFunction(
+      () => window.__nexus.snapshot().mode === "paused",
+    );
     const a = await snapshot();
     await page.waitForTimeout(800);
     const b = await snapshot();
@@ -131,7 +154,7 @@ try {
     });
     await page.waitForTimeout(800);
     await page.screenshot({
-      path: "docs/screenshots/05-character-inspection.png",
+      path: `${output}/screenshots/05-character-inspection.png`,
     });
     await page.evaluate(() => {
       window.__nexus.inspect(1);
@@ -166,7 +189,7 @@ try {
     assert.equal(s.kills, 3);
     assert.equal(s.mode, "victory");
   });
-  await page.screenshot({ path: "docs/screenshots/03-victory.png" });
+  await page.screenshot({ path: `${output}/screenshots/03-victory.png` });
   await pass("Checkpoint restart restores health and sentinels", async () => {
     await page.click("#resume");
     const s = await snapshot();
@@ -180,7 +203,7 @@ try {
       null,
       { timeout: 240000 },
     );
-    await page.screenshot({ path: "docs/screenshots/04-defeat.png" });
+    await page.screenshot({ path: `${output}/screenshots/04-defeat.png` });
     await page.click("#resume");
     assert.equal((await snapshot()).health, 100);
   });
@@ -196,7 +219,7 @@ try {
   await pass("No browser errors", async () => assert.deepEqual(errors, []));
   const metrics = await snapshot();
   await writeFile(
-    "docs/browser-results.json",
+    `${output}/browser-results.json`,
     JSON.stringify(
       {
         date: new Date().toISOString(),
@@ -213,9 +236,9 @@ try {
   );
 } catch (error) {
   console.error(error);
-  await page.screenshot({ path: "docs/screenshots/test-failure.png" });
+  await page.screenshot({ path: `${output}/screenshots/test-failure.png` });
   await writeFile(
-    "docs/browser-results.json",
+    `${output}/browser-results.json`,
     JSON.stringify(
       { results, errors, failure: String(error), snapshot: await snapshot() },
       null,
