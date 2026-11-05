@@ -10,6 +10,13 @@ export class CombatEffects {
   light: T.PointLight;
   private contactLife = 0;
   private fresh = false;
+  private crimson = false;
+  color(crimson: boolean) {
+    this.crimson = crimson;
+    (this.ribbon.material as T.ShaderMaterial).uniforms.hot.value = crimson
+      ? 1
+      : 0;
+  }
   constructor(scene: T.Scene) {
     this.geometry.setAttribute(
       "position",
@@ -32,6 +39,7 @@ export class CombatEffects {
     this.ribbon = new T.Mesh(
       this.geometry,
       new T.ShaderMaterial({
+        uniforms: { hot: { value: 0 } },
         transparent: true,
         depthWrite: false,
         side: T.DoubleSide,
@@ -39,7 +47,7 @@ export class CombatEffects {
         vertexShader:
           "attribute float alpha; attribute float edge; varying float vAlpha; varying float vEdge; void main(){vAlpha=alpha;vEdge=edge;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}",
         fragmentShader:
-          "varying float vAlpha;varying float vEdge;void main(){gl_FragColor=vec4(mix(vec3(.06,.45,.65),vec3(.7,1.,1.),vEdge),vAlpha*(.2+.8*vEdge));}",
+          "uniform float hot;varying float vAlpha;varying float vEdge;void main(){vec3 cool=mix(vec3(.06,.45,.65),vec3(.7,1.,1.),vEdge);vec3 red=mix(vec3(.7,.005,.04),vec3(1.,.25,.35),vEdge);gl_FragColor=vec4(mix(cool,red,hot),vAlpha*(.2+.8*vEdge));}",
       }),
     );
     this.ribbon.frustumCulled = false;
@@ -74,7 +82,14 @@ export class CombatEffects {
     if (this.samples.length > 24) this.samples.shift();
   }
   impact(position: T.Vector3) {
-    this.contactLife = 0.12;
+    (this.flash.material as T.MeshBasicMaterial).color.set(
+      this.crimson ? 0xff4467 : 0xc9ffff,
+    );
+    (this.wave.material as T.MeshBasicMaterial).color.set(
+      this.crimson ? 0xff2348 : 0x6dedfa,
+    );
+    this.light.color.set(this.crimson ? 0xff2348 : 0x72f8ff);
+    this.contactLife = this.crimson ? 0.16 : 0.09;
     this.fresh = true;
     this.flash.position.copy(position);
     this.flash.position.y = 1.15;

@@ -5,6 +5,13 @@ export type Controls = {
   pointer: Axis;
   mouseAim: boolean;
   attack: boolean;
+  chargePressed: boolean;
+  chargeHeld: boolean;
+  chargeReleased: boolean;
+  chargeCancelled: boolean;
+  chargeReleaseDuration: number;
+  chargeEvents: { type: "press" | "release" | "cancel"; duration: number }[];
+  dodge: boolean;
   pause: boolean;
   confirm: boolean;
   back: boolean;
@@ -18,7 +25,7 @@ export type Controls = {
 export const GAMEPAD_ACTIONS = {
   attack: 2,
   heavy: 3,
-  dodge: 0,
+  dodge: 1,
   special: 5,
   ultimate: 7,
   interact: 1,
@@ -30,6 +37,7 @@ const keyCodes: Record<string, string> = {
   s: "KeyS",
   d: "KeyD",
   j: "KeyJ",
+  " ": "Space",
   escape: "Escape",
 };
 export function keyboardCode(event: Pick<KeyboardEvent, "code" | "key">) {
@@ -46,6 +54,10 @@ export function radialDeadzone(x: number, y: number, deadzone: number): Axis {
 }
 const emptyActions = () => ({
   attack: false,
+  chargePressed: false,
+  chargeReleased: false,
+  chargeReleaseDuration: 0,
+  dodge: false,
   pause: false,
   confirm: false,
   back: false,
@@ -56,6 +68,15 @@ export class InputSystem {
   private pending = emptyActions();
   private pointer = { x: 0, y: 0 };
   private mouseAim = false;
+  private chargeWasHeld = false;
+  private chargeOwner = "";
+  private latest!: Controls;
+  private nativeChargeEvents: Controls["chargeEvents"] = [];
+  private chargeQueue: Controls["chargeEvents"] = [];
+  private queued = { ...emptyActions(), chargeCancelled: false };
+  private downAt: number | null = null;
+  private keyboardDownAt: number | null = null;
+  private pollTimer: ReturnType<typeof setInterval>;
   private source: "keyboard" | "gamepad" = "keyboard";
   private previous = new Map<
     number,
@@ -68,6 +89,7 @@ export class InputSystem {
     private canvas: HTMLCanvasElement,
     private playing: () => boolean,
   ) {
+    this.pollTimer = setInterval(() => this.poll(), 1000 / 120);
     canvas.tabIndex = 0;
     try {
       this.setDeadzone(Number(localStorage.getItem("nexus.deadzone") || 0.18));
@@ -120,17 +142,37 @@ export class InputSystem {
     )
       event.preventDefault();
     this.keys.add(code);
-    if (["KeyW", "KeyA", "KeyS", "KeyD", "KeyJ", "Escape"].includes(code)) {
+    if (
+      ["KeyW", "KeyA", "KeyS", "KeyD", "KeyJ", "Space", "Escape"].includes(code)
+    ) {
       this.source = "keyboard";
       if (code !== "KeyJ") this.mouseAim = false;
     }
     if (!event.repeat) {
-      if (code === "KeyJ") this.pending.attack = true;
+      if (code === "KeyJ") {
+        this.pending.chargePressed = true;
+        this.keyboardDownAt = performance.now();
+        this.nativeChargeEvents.push({ type: "press", duration: 0 });
+      }
+      if (code === "Space") this.pending.dodge = true;
       if (code === "Escape") this.pending.pause = true;
     }
   };
   private keyUp = (event: KeyboardEvent) => {
-    this.keys.delete(keyboardCode(event));
+    const code = keyboardCode(event);
+    const wasHeld = this.keys.has(code);
+    this.keys.delete(code);
+    if (code === "KeyJ" && wasHeld && this.source === "keyboard") {
+      this.pending.chargeReleased = true;
+      this.pending.chargeReleaseDuration =
+        this.keyboardDownAt === null
+          ? 0
+          : (performance.now() - this.keyboardDownAt) / 1000;
+      this.nativeChargeEvents.push({
+        type: "release",
+        duration: this.pending.chargeReleaseDuration,
+      });
+    }
   };
   setDeadzone(value: number) {
     this.deadzone = Number.isFinite(value)
@@ -156,15 +198,26 @@ export class InputSystem {
       return [];
     }
   }
+  requestBasic() {
+    this.pending.attack = true;
+  }
+  requestDodge() {
+    this.pending.dodge = true;
+  }
   clearAim() {
     this.mouseAim = false;
   }
   reset() {
     this.keys.clear();
+    this.nativeChargeEvents = [];
+    this.chargeQueue = [];
+    this.queued = { ...emptyActions(), chargeCancelled: false };
+    this.downAt = null;
+    this.keyboardDownAt = null;
     this.pending =
       emptyActions(); /* Keep button history: holding a button across a menu cannot trigger again. */
   }
-  read(): Controls {
+  private sample(): Controls {
     const pads = this.available(),
       supported = pads.filter(
         (p) =>
@@ -237,12 +290,23 @@ export class InputSystem {
       move.x /= length;
       move.y /= length;
     }
+    let chargeHeld = this.keys.has("KeyJ");
+    let owner = "keyboard";
     let aim: Axis | null = null;
     const actions = { ...this.pending };
     if (active && this.source === "gamepad") {
       move = active.move;
       aim = Math.hypot(active.aim.x, active.aim.y) > 0 ? active.aim : null;
       actions.attack ||= active.rising(GAMEPAD_ACTIONS.attack);
+      chargeHeld = Boolean(active.buttons[GAMEPAD_ACTIONS.heavy]);
+      owner = "gamepad:" + active.p.index;
+      actions.chargePressed ||= active.rising(GAMEPAD_ACTIONS.heavy);
+      actions.chargeReleased ||=
+        !chargeHeld &&
+        Boolean(
+          this.previous.get(active.p.index)?.buttons[GAMEPAD_ACTIONS.heavy],
+        );
+      actions.dodge ||= active.rising(GAMEPAD_ACTIONS.dodge);
       actions.pause ||= active.rising(GAMEPAD_ACTIONS.pause);
       actions.confirm ||= active.rising(0);
       actions.back ||= active.rising(1);
@@ -255,8 +319,27 @@ export class InputSystem {
         aim: state.aim,
         nav: state.nav,
       });
+    const chargeCancelled =
+      this.chargeWasHeld &&
+      (owner !== this.chargeOwner || (!chargeHeld && !actions.chargeReleased));
+    this.chargeWasHeld = chargeHeld;
+    this.chargeOwner = owner;
+    const chargeEvents: Controls["chargeEvents"] = [];
+    if (chargeCancelled) chargeEvents.push({ type: "cancel", duration: 0 });
+    if (this.source === "keyboard")
+      chargeEvents.push(...this.nativeChargeEvents);
+    else {
+      if (actions.chargePressed)
+        chargeEvents.push({ type: "press", duration: 0 });
+      if (actions.chargeReleased)
+        chargeEvents.push({ type: "release", duration: 0 });
+    }
+    this.nativeChargeEvents = [];
     this.pending = emptyActions();
     return {
+      chargeEvents,
+      chargeHeld,
+      chargeCancelled,
       move,
       aim,
       pointer: this.pointer,
@@ -267,5 +350,46 @@ export class InputSystem {
       pads: pads.length,
       unsupported: pads.length - supported.length,
     };
+  }
+  private poll() {
+    const value = this.sample(),
+      now = performance.now();
+    for (const event of value.chargeEvents) {
+      if (event.type === "press") this.downAt = now;
+      if (event.type === "release" && value.source === "gamepad")
+        event.duration = this.downAt === null ? 0 : (now - this.downAt) / 1000;
+      if (event.type !== "press") this.downAt = null;
+      this.chargeQueue.push(event);
+      if (this.chargeQueue.length > 32) this.chargeQueue.shift();
+    }
+    const queue = this.queued;
+    for (const key of [
+      "attack",
+      "chargePressed",
+      "chargeReleased",
+      "chargeCancelled",
+      "dodge",
+      "pause",
+      "confirm",
+      "back",
+    ] as const)
+      queue[key] ||= value[key];
+    if (value.navigate) queue.navigate = value.navigate;
+    if (value.chargeReleased)
+      queue.chargeReleaseDuration = value.chargeReleaseDuration;
+    this.latest = value;
+  }
+  read(): Controls {
+    this.poll();
+    const value = {
+      ...this.latest,
+      ...this.queued,
+      chargeEvents: this.chargeQueue.splice(0),
+    };
+    this.queued = { ...emptyActions(), chargeCancelled: false };
+    return value;
+  }
+  dispose() {
+    clearInterval(this.pollTimer);
   }
 }

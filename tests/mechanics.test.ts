@@ -106,16 +106,20 @@ test("analogue radial deadzone eliminates drift, scales proportionally and caps 
 
 import { cutPose, CUT, sweptBladeHits } from "../src/combat";
 test("cut has anticipation, active sweep and smooth recovery", () => {
-  assert.equal(cutPose(0.05).phase, "anticipation");
-  assert.equal(cutPose(0.2).phase, "execution");
-  assert.equal(cutPose(0.45).phase, "recovery");
+  assert.equal(cutPose(0.025).phase, "anticipation");
+  assert.equal(cutPose(0.1).phase, "execution");
+  assert.equal(cutPose(0.22).phase, "recovery");
   assert.equal(cutPose(0).blend, 0);
   assert.equal(cutPose(CUT.duration).blend, 0);
   assert.ok(
-    Math.abs(cutPose(0.12 - 1e-6).torso - cutPose(0.12 + 1e-6).torso) < 1e-4,
+    Math.abs(
+      cutPose(CUT.windup - 1e-6).torso - cutPose(CUT.windup + 1e-6).torso,
+    ) < 1e-4,
   );
   assert.ok(
-    Math.abs(cutPose(0.34 - 1e-6).torso - cutPose(0.34 + 1e-6).torso) < 1e-4,
+    Math.abs(
+      cutPose(CUT.activeEnd - 1e-6).torso - cutPose(CUT.activeEnd + 1e-6).torso,
+    ) < 1e-4,
   );
 });
 test("swept blade hits interior crossed between samples, excludes rear and handles stationary blade", () => {
@@ -125,4 +129,184 @@ test("swept blade hits interior crossed between samples, excludes rear and handl
   assert.ok(!sweptBladeHits(a, b, { x: 0, z: -2 }, 0.6));
   assert.ok(sweptBladeHits(a, a, { x: -1, z: 1 }, 0.1));
   assert.ok(!sweptBladeHits(a, a, { x: 4, z: 4 }, 0.1));
+});
+
+import { PlayerActions, HEAVY, DODGE, dodgeSpeed } from "../src/actions";
+import {
+  WaveDirector,
+  WAVES,
+  findSpawn,
+  segmentHitsCircle,
+} from "../src/waves";
+test("basic attack duration halves 1.1 and permits rapid bounded sequences", () => {
+  assert.ok(CUT.duration <= 0.3 && CUT.duration < 0.52 * 0.6);
+  const a = new PlayerActions();
+  a.basic();
+  a.update(1 / 60);
+  assert.equal(a.kind, "strike");
+  const energy = a.energy;
+  for (let i = 0; i < 12; i++) a.update(1 / 60);
+  a.basic();
+  for (let i = 0; i < 6; i++) a.update(1 / 60);
+  assert.equal(a.sequence, 2);
+  assert.ok(a.energy < energy);
+  for (let i = 0; i < 90; i++) a.update(1 / 60);
+  assert.equal(a.kind, "idle");
+  assert.equal(a.sequence, 2);
+});
+test("charge is capped, release scales damage and cost, early release cancels", () => {
+  const a = new PlayerActions();
+  assert.ok(a.startCharge());
+  a.update(0.1);
+  assert.equal(a.releaseCharge(), false);
+  assert.equal(a.energy, 100);
+  a.startCharge();
+  a.update(0.3);
+  assert.ok(a.releaseCharge());
+  const weak = a.damage,
+    cost = 100 - a.energy;
+  assert.ok(weak > 34 && weak < 85);
+  assert.ok(cost >= 18 && cost < 38);
+  assert.equal(a.releaseCharge(), false);
+  a.reset();
+  a.startCharge();
+  a.update(100);
+  assert.equal(a.charge, 1.2);
+  assert.ok(a.releaseCharge());
+  assert.equal(a.damage, 85);
+  assert.equal(a.energy, 62);
+  assert.equal(a.sequence, 1);
+  a.update(HEAVY.duration);
+  assert.equal(a.kind, "idle");
+  assert.equal(a.charge, 0);
+});
+test("cancel charge restores idle without release damage; energy limits power", () => {
+  const a = new PlayerActions();
+  a.startCharge();
+  a.update(0.9);
+  a.cancel();
+  assert.equal(a.kind, "idle");
+  assert.equal(a.releaseCharge(), false);
+  assert.equal(a.energy, 100);
+  a.energy = 20;
+  a.startCharge();
+  a.update(1.2);
+  a.releaseCharge();
+  assert.ok(a.energy >= 0);
+  assert.ok(a.damage < 50);
+});
+test("dodge has bounded invulnerability, energy cost and cooldown; cancels charge/recovery only", () => {
+  const a = new PlayerActions();
+  assert.ok(a.dodge());
+  assert.equal(a.energy, 82);
+  assert.equal(a.invulnerable, false);
+  assert.equal(a.dodge(), false);
+  a.update(0.08);
+  assert.ok(a.invulnerable);
+  a.update(0.14);
+  assert.equal(a.invulnerable, false);
+  a.update(0.1);
+  assert.equal(a.kind, "idle");
+  assert.equal(a.dodge(), false);
+  a.update(0.25);
+  assert.ok(a.dodge());
+  a.reset();
+  a.startCharge();
+  a.update(0.3);
+  assert.ok(a.dodge());
+  assert.equal(a.charge, 0);
+  a.reset();
+  a.basic();
+  a.update(0.01);
+  assert.equal(a.dodge(), false);
+  a.update(0.18);
+  assert.ok(a.dodge());
+});
+test("dodge integration cannot cross a wall or island edge", () => {
+  let p = { x: -4, z: 0 };
+  for (let i = 0; i < 18; i++)
+    p = moveCircle(p, { x: dodgeSpeed(i / 60) / 60, z: 0 }, 0.48, [
+      { x: 0, z: 0, radius: 1 },
+    ]);
+  assert.ok(p.x <= -1.48 + 1e-8);
+  p = { x: 13, z: 0 };
+  for (let i = 0; i < 18; i++)
+    p = moveCircle(p, { x: dodgeSpeed(i / 60) / 60, z: 0 }, 0.48, []);
+  assert.ok(p.x <= 13.82 + 1e-8);
+});
+test("wave director queues beyond cap, waits for kills and interval, then completes all four", () => {
+  const d = new WaveDirector(3);
+  let alive = 0,
+    spawns = 0;
+  const spawn = () => {
+    alive++;
+    spawns++;
+    return true;
+  };
+  d.reset();
+  d.update(0, alive, spawn);
+  assert.equal(alive, 3);
+  assert.equal(d.pending.length, 1);
+  alive--;
+  d.update(0.01, alive, spawn);
+  assert.equal(alive, 3);
+  assert.equal(spawns, 4);
+  assert.equal(d.wave, 0);
+  for (let wave = 0; wave < 4; wave++) {
+    while (d.pending.length) {
+      alive = 0;
+      d.update(0.01, alive, spawn);
+    }
+    alive = 0;
+    d.update(0.01, alive, spawn);
+    if (wave < 3) {
+      assert.equal(d.state, "intermission");
+      d.update(2.9, 0, spawn);
+      assert.equal(d.wave, wave);
+      d.update(0.11, 0, spawn);
+      assert.equal(d.wave, wave + 1);
+      d.update(0.01, 0, spawn);
+    }
+  }
+  assert.equal(d.state, "completed");
+  d.reset();
+  assert.equal(d.wave, 0);
+  assert.deepEqual(d.pending, WAVES[0]);
+});
+test("spawn search keeps every archetype clear of player, obstacles and peers", () => {
+  for (let seed = 0; seed < 50; seed++) {
+    const obstacles = [
+      { x: 0, z: 8, radius: 1 },
+      { x: 6, z: 0, radius: 1 },
+    ];
+    const occupied: { x: number; z: number; radius: number }[] = [];
+    for (let i = 0; i < 6; i++) {
+      const radius = i === 5 ? 0.85 : 0.5,
+        p = findSpawn(
+          seed * 101 + i,
+          { x: 1, z: 3 },
+          obstacles,
+          occupied,
+          radius,
+        );
+      assert.ok(p);
+      assert.ok(Math.hypot(p.x - 1, p.z - 3) > 3.4 + radius);
+      assert.ok(
+        obstacles
+          .concat(occupied)
+          .every(
+            (o) => Math.hypot(p.x - o.x, p.z - o.z) > o.radius + radius + 0.24,
+          ),
+      );
+      occupied.push({ ...p, radius });
+    }
+  }
+});
+test("projectile swept collision catches fast crossings and excludes misses", () => {
+  assert.ok(
+    segmentHitsCircle({ x: -5, z: 0 }, { x: 5, z: 0 }, { x: 0, z: 0 }, 0.5),
+  );
+  assert.ok(
+    !segmentHitsCircle({ x: -5, z: 2 }, { x: 5, z: 2 }, { x: 0, z: 0 }, 0.5),
+  );
 });

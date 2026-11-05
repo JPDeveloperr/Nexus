@@ -1,22 +1,25 @@
 import type { Point } from "./mechanics";
 export const CUT = {
-  windup: 0.12,
-  activeEnd: 0.34,
-  duration: 0.52,
-  buffer: 0.18,
-  hitstop: 0.045,
+  windup: 0.05,
+  activeEnd: 0.16,
+  duration: 0.26,
+  buffer: 0.12,
+  hitstop: 0.018,
 };
 const smooth = (p: number) => {
   p = Math.max(0, Math.min(1, p));
   return p * p * (3 - 2 * p);
 };
-export function cutPose(elapsed: number) {
-  if (elapsed < CUT.windup) {
-    const blend = smooth(elapsed / CUT.windup);
+export function cutPose(
+  elapsed: number,
+  profile: { windup: number; activeEnd: number; duration: number } = CUT,
+) {
+  if (elapsed < profile.windup) {
+    const blend = smooth(elapsed / profile.windup);
     return { phase: "anticipation", blend, torso: -0.65 * blend, sweep: -1.15 };
   }
-  if (elapsed < CUT.activeEnd) {
-    const p = (elapsed - CUT.windup) / (CUT.activeEnd - CUT.windup);
+  if (elapsed < profile.activeEnd) {
+    const p = (elapsed - profile.windup) / (profile.activeEnd - profile.windup);
     const arc = p * p;
     return {
       phase: "execution",
@@ -26,7 +29,10 @@ export function cutPose(elapsed: number) {
     };
   }
   const blend =
-    1 - smooth((elapsed - CUT.activeEnd) / (CUT.duration - CUT.activeEnd));
+    1 -
+    smooth(
+      (elapsed - profile.activeEnd) / (profile.duration - profile.activeEnd),
+    );
   return { phase: "recovery", blend, torso: 0.65 * blend, sweep: 1.15 };
 }
 export type BladeSample = { base: Point; tip: Point };

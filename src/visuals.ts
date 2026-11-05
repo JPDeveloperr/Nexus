@@ -48,6 +48,27 @@ export function mesh(
   y = 0,
   z = 0,
 ) {
+  if (
+    [
+      "BoxGeometry",
+      "CylinderGeometry",
+      "SphereGeometry",
+      "ConeGeometry",
+      "OctahedronGeometry",
+      "IcosahedronGeometry",
+    ].includes(g.type)
+  ) {
+    const key =
+      g.type +
+      JSON.stringify(
+        (g as T.BufferGeometry & { parameters: unknown }).parameters,
+      );
+    const cached = geometryCache.get(key);
+    if (cached) {
+      g.dispose();
+      g = cached;
+    } else geometryCache.set(key, g);
+  }
   const o = new T.Mesh(g, m);
   o.position.set(x, y, z);
   o.castShadow = true;
@@ -85,6 +106,8 @@ function ring(
   r.rotation.x = -Math.PI / 2;
   return r;
 }
+// Share immutable armour geometry across pooled actors; cloth remains per-character.
+const geometryCache = new Map<string, T.BufferGeometry>();
 // A tapered, faceted armour shell. Elliptical profiles avoid box-built limbs.
 function shell(
   parent: T.Object3D,
@@ -114,6 +137,7 @@ export class Warrior {
   private gait = 0;
   private movementBlend = 0;
   blade: T.Mesh;
+  bladeCore: T.Mesh;
   cape: T.Mesh;
   aura: T.Mesh;
   constructor(public corrupted = false) {
@@ -250,7 +274,16 @@ export class Warrior {
       0,
       -0.02,
     );
-    box(sword, glow, 0, 0.79, 0.055, 0.045, 1.09, 0.035);
+    this.bladeCore = box(
+      sword,
+      glow.clone(),
+      0,
+      0.79,
+      0.055,
+      0.045,
+      1.09,
+      0.035,
+    );
     // Cloth surface with a scalloped hem, deformed every frame.
     const cloth = new T.PlaneGeometry(0.93, 1.29, 8, 10);
     cloth.translate(0, -0.645, 0);
@@ -293,6 +326,13 @@ export class Warrior {
     hurt: number,
     dead = false,
     dt = 1 / 60,
+    action?: {
+      elapsed: number;
+      profile: { windup: number; activeEnd: number; duration: number };
+      charge: number;
+      heavy: boolean;
+      dodge: number;
+    },
   ) {
     this.gait += speed * dt * 2.5;
     this.movementBlend +=
@@ -320,8 +360,14 @@ export class Warrior {
       this.rightArm.rotation.x = -1.3 - Math.sin(p * Math.PI) * 0.5;
       this.rightArm.rotation.z = -0.8 + Math.sin(p * Math.PI * 1.7) * 1.7;
     }
-    if (!this.corrupted && attack > 0) {
-      const pose = cutPose(CUT.duration - attack),
+    if (!this.corrupted && (attack > 0 || (action?.charge || 0) > 0)) {
+      const pose =
+          (action?.charge || 0) > 0
+            ? cutPose(CUT.windup * 0.98)
+            : cutPose(
+                action?.elapsed ?? CUT.duration - attack,
+                action?.profile,
+              ),
         blend = pose.blend;
       this.torso.rotation.y = pose.torso;
       this.rightArm.rotation.x = T.MathUtils.lerp(
@@ -333,9 +379,9 @@ export class Warrior {
       this.rightForearm.rotation.x = -0.45 * blend;
       this.root.updateWorldMatrix(true, true);
       const desired = new T.Vector3(
-        Math.sin(pose.sweep),
+        Math.sin(pose.sweep * (action?.heavy ? 1.18 : 1)),
         0.06,
-        Math.cos(pose.sweep),
+        Math.cos(pose.sweep * (action?.heavy ? 1.18 : 1)),
       ).normalize();
       const rootQ = this.root.getWorldQuaternion(new T.Quaternion());
       const worldQ = rootQ.multiply(
@@ -383,8 +429,31 @@ export class Warrior {
     }
     (this.blade.material as T.MeshStandardMaterial).emissiveIntensity =
       !this.corrupted && attack > 0
-        ? 0.6 + cutPose(CUT.duration - attack).blend * 1.8
+        ? 0.6 +
+          cutPose(action?.elapsed ?? CUT.duration - attack, action?.profile)
+            .blend *
+            1.8
         : 0.6;
+    if (!this.corrupted) {
+      const power = action?.charge || (action?.heavy ? 1 : 0);
+      const material = this.blade.material as T.MeshStandardMaterial,
+        core = this.bladeCore.material as T.MeshStandardMaterial;
+      const redMix = Math.min(1, power * 4);
+      material.color.set(0x9edce5).lerp(new T.Color(0xe71339), redMix);
+      material.emissive.set(0x167787).lerp(new T.Color(0xff1239), redMix);
+      if (power > 0)
+        material.emissiveIntensity =
+          0.8 + power * 3.5 + Math.sin(t * 24) * power * 0.35;
+      core.color.set(power > 0 ? 0xff4161 : 0x88faff);
+      core.emissive.set(power > 0 ? 0xff1538 : 0x21d8ef);
+      core.emissiveIntensity = 2.3 + power * 4;
+      if ((action?.dodge ?? -1) >= 0) {
+        this.torso.rotation.x = -0.65;
+        this.torso.position.y -= 0.22;
+        this.leftLeg.rotation.x = -0.8;
+        this.rightLeg.rotation.x = 0.9;
+      }
+    }
     this.torso.rotation.z = hurt > 0 ? Math.sin(hurt * 35) * 0.14 : 0;
     this.root.rotation.z = dead
       ? Math.min(1.4, this.root.rotation.z + 0.05)
