@@ -1,0 +1,54 @@
+{
+  "records": [
+    {
+      "keys": [
+        "KeyW"
+      ],
+      "distance": 8.984939181646052,
+      "screenX": -2.208224696431671e-7,
+      "screenY": -8.984938802027418,
+      "simulationSeconds": 2.0166666666666595
+    },
+    {
+      "keys": [
+        "KeyA"
+      ],
+      "distance": 7.839500436844011,
+      "screenX": -7.839391987275535,
+      "screenY": -0.04117251350917517,
+      "simulationSeconds": 1.8999999999999937
+    },
+    {
+      "keys": [
+        "KeyS"
+      ],
+      "distance": 8.754939181646202,
+      "screenX": 2.151697771068939e-7,
+      "screenY": 8.754938811745197,
+      "simulationSeconds": 1.9666666666666597
+    },
+    {
+      "keys": [
+        "KeyD"
+      ],
+      "distance": 9.06160584831268,
+      "screenX": 9.061605465454841,
+      "screenY": -2.2270670463342412e-7,
+      "simulationSeconds": 2.033333333333397
+    },
+    {
+      "keys": [
+        "KeyW",
+        "KeyA"
+      ],
+      "distance": 8.805669015697966,
+      "screenX": -6.226260383945554,
+      "screenY": -6.226835624386944,
+      "simulationSeconds": 2.0000000000000995
+    }
+  ],
+  "collision": true,
+  "focus": true,
+  "keyFallback": true,
+  "errors": []
+}

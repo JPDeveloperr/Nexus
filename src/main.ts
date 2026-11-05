@@ -12,6 +12,8 @@ import {
   moveCircle,
 } from "./mechanics";
 import "./style.css";
+import { InputSystem } from "./input";
+import { FixedStepClock } from "./timing";
 
 type Mode = "menu" | "playing" | "paused" | "defeat" | "victory";
 type EnemyState =
@@ -187,7 +189,11 @@ const slash = mesh(
 );
 slash.rotation.x = -Math.PI / 2;
 slash.visible = false;
-const keys = new Set<string>();
+const clock = new FixedStepClock();
+const input = new InputSystem(renderer.domElement, () => mode === "playing");
+let controls = input.read();
+const velocity = new T.Vector2();
+let actualSpeed = 0;
 const pointer = new T.Vector2(0, 0);
 const aim = new T.Vector3(0, 0, -1);
 const ray = new T.Raycaster();
@@ -243,7 +249,9 @@ function notify(text: string) {
 }
 function setMode(next: Mode) {
   mode = next;
-  keys.clear();
+  input.reset();
+  clock.reset();
+  velocity.set(0, 0);
   $("#overlay").classList.toggle("hidden", next !== "menu");
   $("#hud").classList.toggle("hidden", next === "menu");
   $("#mission").classList.toggle("hidden", next === "menu");
@@ -251,6 +259,7 @@ function setMode(next: Mode) {
     "hidden",
     next === "menu" || next === "playing",
   );
+  if(next === "playing") renderer.domElement.focus({preventScroll:true});
   if (next === "paused" || next === "defeat" || next === "victory") {
     $("#dialog-kicker").textContent =
       next === "paused"
@@ -327,8 +336,7 @@ function startAttack() {
   sound(260, 0.16, 0.015);
 }
 $("#start").onclick = () => {
-  audio ??= new AudioContext();
-  void audio.resume();
+  try { audio ??= new AudioContext(); void audio.resume().catch(()=>{}); } catch { /* Audio must never block play. */ }
   reset();
 };
 $("#resume").onclick = () => (mode === "paused" ? setMode("playing") : reset());
@@ -338,36 +346,8 @@ $("#pause").onclick = () => {
   else if (mode === "paused") setMode("playing");
 };
 $("#attack-button").onclick = startAttack;
-window.addEventListener("keydown", (e) => {
-  if (["Space", "ArrowUp", "ArrowDown"].includes(e.code)) e.preventDefault();
-  if (e.code === "Escape" && !e.repeat) {
-    if (mode === "playing") setMode("paused");
-    else if (mode === "paused") setMode("playing");
-  }
-  if (e.code === "KeyJ" && !e.repeat) startAttack();
-  keys.add(e.code);
-});
-window.addEventListener("keyup", (e) => keys.delete(e.code));
-window.addEventListener("blur", () => {
-  keys.clear();
-  if (mode === "playing") setMode("paused");
-});
-document.addEventListener("visibilitychange", () => {
-  if (document.hidden && mode === "playing") setMode("paused");
-});
-renderer.domElement.addEventListener("pointermove", (e) => {
-  pointer.set(
-    (e.clientX / innerWidth) * 2 - 1,
-    (-e.clientY / innerHeight) * 2 + 1,
-  );
-  mouseAiming = true;
-  $("#crosshair").style.left = e.clientX + "px";
-  $("#crosshair").style.top = e.clientY + "px";
-});
-renderer.domElement.addEventListener("pointerdown", (e) => {
-  if (e.button === 0) startAttack();
-});
-renderer.domElement.addEventListener("contextmenu", (e) => e.preventDefault());
+window.addEventListener("blur", () => { if(mode === "playing") setMode("paused"); });
+document.addEventListener("visibilitychange", () => { if(document.hidden && mode === "playing") setMode("paused"); });
 function applyQuality(value: string) {
   const high = value === "high",
     low = value === "low";
@@ -515,20 +495,12 @@ function updateEnemy(e: Enemy, dt: number) {
     speed = s;
   }
 }
-let previous = performance.now();
-let frameTimes: number[] = [];
-let metricsTimer = 0;
-function frame(now: number) {
-  requestAnimationFrame(frame);
-  const frameMs = Math.max(0, now - previous);
-  const dt = Math.min(frameMs / 1000, 0.05);
-  previous = now;
+function simulate(dt:number) {
   if (mode === "playing" || mode === "menu") time += dt;
   if (mode === "playing") {
     ray.setFromCamera(pointer, camera);
     ray.ray.intersectPlane(plane, aim);
-    let dx = Number(keys.has("KeyD")) - Number(keys.has("KeyA")),
-      dz = Number(keys.has("KeyS")) - Number(keys.has("KeyW"));
+    const dx=controls.move.x, dz=controls.move.y;
     // Project keyboard axes onto the isometric ground plane: W always moves up-screen.
     const forward = new T.Vector3(
         -cameraOffset.x,
@@ -548,14 +520,18 @@ function frame(now: number) {
           radius: 0.5,
         })),
     );
+    const smoothing=1-Math.exp(-14*dt);
+    velocity.lerp(new T.Vector2(direction.x*speed,direction.z*speed),smoothing);
+    const before=player.root.position.clone();
     const next = moveCircle(
       player.root.position,
-      { x: direction.x * speed * dt, z: direction.z * speed * dt },
+      { x: velocity.x * dt, z: velocity.y * dt },
       PLAYER_RADIUS,
       blockers,
     );
     player.root.position.x = next.x;
     player.root.position.z = next.z;
+    actualSpeed=Math.hypot(next.x-before.x,next.z-before.z)/dt;
     if (attack === 0) {
       if (mouseAiming)
         player.root.rotation.y = dampAngle(
@@ -622,7 +598,7 @@ function frame(now: number) {
     } else slash.visible = false;
     hurt = Math.max(0, hurt - dt);
     energy = Math.min(100, energy + dt * 15);
-    player.animate(time, direction.length() * speed, attack, hurt);
+    player.animate(time, actualSpeed, attack, hurt);
     for (const e of enemies) {
       if (mode !== "playing") break;
       updateEnemy(e, dt);
@@ -637,6 +613,19 @@ function frame(now: number) {
     cameraTarget.lerp(new T.Vector3(-2, 0, -1.5), 0.02);
     slash.visible = false;
   }
+}
+let previous=performance.now();
+let frameTimes:number[]=[];
+let metricsTimer=0;
+function frame(now:number) {
+  requestAnimationFrame(frame);
+  const frameMs=Math.max(0,now-previous);previous=now;
+  const dt=Math.min(frameMs/1000,.5);
+  controls=input.read();
+  pointer.set(controls.pointer.x,controls.pointer.y);mouseAiming=controls.mouseAim;
+  if(controls.pause){if(mode==='playing')setMode('paused');else if(mode==='paused')setMode('playing');}
+  if(controls.attack)startAttack();
+  if(mode==='playing'||mode==='menu')clock.advance(dt,simulate);else clock.reset();
   if (mode === "playing" || mode === "menu") temple.update(time);
   for (let i = 0; i < particleCount; i++) {
     const s = sparks[i];
@@ -684,6 +673,7 @@ if (params.has("test")) {
         energy,
         kills,
         attack,
+        actualSpeed, velocity:velocity.toArray(), input:controls, focus:document.activeElement?.tagName,
         player: {
           x: player.root.position.x,
           z: player.root.position.z,
@@ -709,10 +699,10 @@ if (params.has("test")) {
           PLAYER_RADIUS,
           temple.obstacles,
         );
-        player.root.position.set(p.x, 0, p.z);
+        player.root.position.set(p.x, 0, p.z); velocity.set(0,0);
       },
       face: (a: number) => {
-        mouseAiming = false;
+        mouseAiming = false; input.clearAim();
         player.root.rotation.y = a;
       },
       inspect: (zoom: number) => {

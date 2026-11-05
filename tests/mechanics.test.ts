@@ -64,3 +64,19 @@ test("obstacle projection near the rim cannot push a body into the abyss", () =>
     assert.ok(Math.hypot(p.x, p.z) <= 13.82 + 1e-9);
   }
 });
+
+import { FixedStepClock } from '../src/timing';
+import { keyboardCode } from '../src/input';
+test('fixed steps preserve elapsed wall time at 4 FPS instead of discarding 80%',()=>{
+ const clock=new FixedStepClock();let seconds=0;
+ for(let i=0;i<8;i++)clock.advance(.25,dt=>seconds+=dt);
+ assert.ok(Math.abs(seconds-2)<1e-8);
+});
+test('fixed clock bounds long suspension, resets pending time and never runs a giant step',()=>{
+ const clock=new FixedStepClock();let steps=0;
+ clock.advance(100,dt=>{assert.ok(dt<=1/60);steps++;});assert.equal(steps,30);
+ clock.advance(.005,()=>assert.fail());clock.reset();assert.equal(clock.advance(.012,()=>assert.fail()),0);
+});
+test('keyboard falls back to key when browser omits physical code',()=>{
+ assert.equal(keyboardCode({key:'W',code:''}),'KeyW');assert.equal(keyboardCode({key:'z',code:'KeyW'}),'KeyW');
+});

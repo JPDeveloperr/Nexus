@@ -1,0 +1,17 @@
+{
+  "reference": "b0a077995dae025b6e0da80d921061932a9bbd58",
+  "test": "real KeyD held 2000ms, frames artificially delayed 250ms",
+  "before": {
+    "x": 0,
+    "z": 5,
+    "facing": 3.141592653589793
+  },
+  "after": {
+    "x": 1.318963392035655,
+    "z": 4.076725625575039,
+    "facing": 2.188671534891691
+  },
+  "simulationSeconds": 0.35,
+  "distance": 1.6100000000000014,
+  "nominalDistance": 9.2
+}
