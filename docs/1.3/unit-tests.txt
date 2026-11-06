@@ -1,0 +1,62 @@
+
+> nexus-shattered-realms@1.3.0 test
+> node --import tsx tests/mechanics.test.ts && node --import tsx tests/enemies.test.ts && node --import tsx tests/symphony.test.ts
+
+✔ seed produces identical layouts and distinct seeds diverge (2.753025ms)
+✔ island edge contains movement even for an unusually large step (0.640796ms)
+✔ substeps prevent crossing a column; diagonal movement slides (0.211192ms)
+✔ zero distance overlap resolves without NaN (0.175049ms)
+✔ strike includes enemies in its forward arc, excludes rear and distant targets (0.235819ms)
+✔ angle interpolation takes short route across ±pi (0.271691ms)
+✔ obstacle projection near the rim cannot push a body into the abyss (1.967575ms)
+✔ fixed steps preserve elapsed wall time at 4 FPS instead of discarding 80% (0.193616ms)
+✔ fixed clock bounds long suspension, resets pending time and never runs a giant step (0.209609ms)
+✔ keyboard falls back to key when browser omits physical code (0.166506ms)
+✔ analogue radial deadzone eliminates drift, scales proportionally and caps diagonals (0.263949ms)
+✔ cut has anticipation, active sweep and smooth recovery (0.211122ms)
+✔ swept blade hits interior crossed between samples, excludes rear and handles stationary blade (0.303698ms)
+✔ basic attack duration halves 1.1 and permits rapid bounded sequences (0.46093ms)
+✔ charge is capped, release scales damage and cost, early release cancels (0.201748ms)
+✔ cancel charge restores idle without release damage; energy limits power (0.407522ms)
+✔ dodge has bounded invulnerability, energy cost and cooldown; cancels charge/recovery only (0.308726ms)
+✔ dodge integration cannot cross a wall or island edge (0.359711ms)
+✔ wave director queues beyond cap, waits for kills and interval, then completes all four (0.369606ms)
+✔ spawn search keeps every archetype clear of player, obstacles and peers (1.233411ms)
+✔ projectile swept collision catches fast crossings and excludes misses (0.109853ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 26.711019
+✔ all archetypes attack, projectiles and shockwaves advance, coordination and collisions remain bounded (556.074429ms)
+✔ strong attacks interrupt archer, brute recovery is vulnerable, death returns actors to pool (116.645609ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 684.649577
+✔ three distinct strikes, one buffered edge per window, no repeat when idle (1.441047ms)
+✔ combo inactivity, dodge, charge and cancellation restart from first strike (0.965835ms)
+✔ attack priority: active swing refuses dodge/charge, recovery allows dodge and discards queued edge (0.209929ms)
+✔ charge power is stable under different delta sizes (0.292642ms)
+✔ swept wave hits a distant target once, shares exclusions with melee, expires at 3–5 units (4.18716ms)
+✔ wave walls stop damage behind them even with a giant step; arena and pools are bounded (0.649578ms)
+✔ wave damage rejected during spawn does not consume an enemy hit (0.498085ms)
+✔ articulated sentinel death: impact direction, floor, no collision or attack, finite fade and pool restore (136.061328ms)
+✔ articulated raider death: impact direction, floor, no collision or attack, finite fade and pool restore (74.625568ms)
+✔ articulated brute death: impact direction, floor, no collision or attack, finite fade and pool restore (83.208556ms)
+✔ articulated archer death: impact direction, floor, no collision or attack, finite fade and pool restore (37.640178ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 353.886138

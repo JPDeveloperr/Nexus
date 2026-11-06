@@ -1,6 +1,6 @@
-# NEXUS: Shattered Realms — 1.2 CRIMSON FURY
+# NEXUS: Shattered Realms — 1.3 BLADE SYMPHONY
 
-Jogo de ação isométrico com Three.js, TypeScript e geometria procedural. A versão 1.2 parte da [1.1, commit 1996bde](https://github.com/JPDeveloperr/Nexus/commit/1996bde4cb555aec89f150f7ded5b36d0cbe3996) e mantém a arena, Kaeron, a iluminação e as sentinelas. Acrescenta combate rápido, Crimson Strike, Phantom Dodge, três arquétipos e quatro ondas.
+Jogo de ação isométrico com Three.js, TypeScript e geometria procedural. A versão 1.3 parte da [1.2 validada, commit 67f721d](https://github.com/JPDeveloperr/Nexus/commit/67f721d1233515d9dd11bf857f9e2fd2a596c13a), preservando templo, personagens, câmera, iluminação, inimigos, ondas e controles. Acrescenta combo de três golpes, Crimson Wave de curto alcance e mortes articuladas direcionais.
 
 ## Executar no Fedora KDE / Konsole / Fish
 
@@ -25,13 +25,13 @@ O build valida TypeScript e gera `dist/` para hospedagem estática. A distribui�
 Na pasta do seu clone, preserve alterações locais antes de trocar de branch:
 
 ```fish
-git fetch origin feature/nexus-1.2-crimson-fury
-git switch -c feature/nexus-1.2-crimson-fury FETCH_HEAD
+git fetch origin feature/nexus-1.3-blade-symphony
+git switch -c feature/nexus-1.3-blade-symphony FETCH_HEAD
 npm ci
 npm run dev
 ```
 
-Isso funciona inclusive com o clone original feito com `--single-branch`. Se a branch já existir localmente, use `git switch feature/nexus-1.2-crimson-fury` e `git pull --ff-only origin feature/nexus-1.2-crimson-fury`. `main` e as entregas anteriores permanecem preservadas.
+Isso funciona inclusive com o clone original feito com `--single-branch`. Se a branch já existir localmente, use `git switch feature/nexus-1.3-blade-symphony` e `git pull --ff-only origin feature/nexus-1.3-blade-symphony`. `main` e as entregas anteriores permanecem preservadas.
 
 ## Controles
 
@@ -52,8 +52,10 @@ A leitura do gamepad roda a 120 Hz, separada dos renders, com fila ordenada de p
 
 ## Combate
 
-- **Corte básico:** 50 ms de antecipação, 110 ms de execução e 100 ms de recuperação: **260 ms**, contra 520 ms na 1.1. Dano base 34, custo de 8 de energia e buffer de 120 ms. Hitbox usa a região realmente varrida pela lâmina, com no máximo um acerto por alvo e golpe. Há hitstop curto, quantizado pelos passos físicos.
+- **Combo básico:** Swift Slash (220 ms), Reverse Edge (240 ms) e Falling Crescent (330 ms). Cortes horizontais opostos e finalizador diagonal com avanço de cerca de 0,23 unidade, dano 30% maior e knockback moderado. Custo de 8 por golpe. Uma entrada antecipada após a preparação fica reservada até a próxima recuperação; cliques extras não estendem a fila. Após 500 ms em idle, o próximo golpe reinicia a sequência. Esquiva cancela recuperação e descarta a reserva. Quadril, tronco, cabeça, braços, punhos e pernas participam; braço de apoio usa IK e transições usam amortecimento exponencial. Hitbox continua acompanhando a lâmina real, com um acerto por alvo/golpe.
 - **Crimson Strike:** segure por pelo menos 200 ms. Carga limitada a 1.200 ms, espada progressivamente vermelha, partículas orbitais, pulsação, luz e halo GLSL. Soltar libera um arco carmesim, com dano até **85 (2,5×)**, custo proporcional até 38, knockback maior e recuperação mais longa. A duração do golpe liberado é 580 ms. Energia insuficiente limita a potência real; abaixo de 18, a carga não inicia. Soltar cedo cancela sem custo e informa o motivo. Pausa, perda de foco, dano, morte e desconexão cancelam com segurança.
+- **Crimson Wave:** o corte carregado lança uma meia-lua procedural vermelha a partir da lâmina durante a execução. Alcance de 3–5 unidades e dano de 34–85, proporcionais à carga. Núcleo luminoso, bordas transparentes, distorção GLSL, partículas e três ecos translúcidos; pool de quatro lançamentos. Colisão varrida considera colunas, obstáculos, borda e inimigos. **Regra de dano:** o primeiro contato válido (espada ou rajada) consome o acerto desse lançamento para aquele inimigo; os dois compartilham a mesma lista. Não há soma de dano corpo a corpo + rajada no mesmo alvo.
+
 - **Phantom Dodge:** deslocamento contínuo por 300 ms, com colisões, inclinação e afterimages. Invulnerabilidade somente entre 55 e 215 ms, cooldown de 550 ms e custo de 18. Usa a direção de WASD/analógico ou a orientação atual se não houver direção. Pode cancelar carga e recuperação; não interrompe a execução ativa da espada. Não atravessa colunas nem a borda e não pode ser mantida infinitamente sem custo.
 
 Vida máxima 100, energia máxima 100 e regeneração de 15/s fora da carga. Corrida 4,6 unidades/s; movimento é reduzido durante corte e preparação pesada. A direção do golpe fica travada durante sua execução. Energia, cooldown e invulnerabilidade fazem parte da simulação, não da interface.
@@ -76,12 +78,16 @@ Dano aproximado por ataque: sentinela 14, raider 9, projétil 12, onda do brute 
 
 São **21 inimigos** no total. Há três segundos entre ondas, com aviso e contagem no HUD. A próxima onda só começa após eliminar a anterior. Spawn evita o jogador, obstáculos e outros corpos, com breve sinalização. Limite simultâneo padrão **6**; acrescente `?enemyLimit=4` para outro limite entre 1 e 8. Inimigos excedentes aguardam uma vaga. A coordenação limita preparações/ataques simultâneos a dois e espaça novas iniciativas; os telegráficos continuam necessários para esquivar. Derrota e vitória permitem reiniciar a primeira onda com vida/energia restauradas.
 
+Mortes usam a pose real no instante do impacto, reação direcional, perda de equilíbrio, joelhos articulados, queda acelerada pela gravidade, contato de chão por vértices transformados das malhas e repouso amortecido. Há queda para trás, lateral e pesada para Brutes; Archers perdem sustentação e dispersam fragmentos. Corpos permanecem por 2,8 s, com fade nos últimos 650 ms; colisão e ataque cessam imediatamente. A queda continua após a vitória ou derrota. Não há ragdoll de corpos rígidos: a solução é procedural híbrida, estável e limitada por chão.
+
 ## Arquitetura e recursos
 
 - `src/main.ts`: integração do jogo, estados, HUD, câmera isométrica e áudio sintetizado.
 - `src/input.ts`: camada de entrada, Gamepad API e fila de eventos.
 - `src/actions.ts`: estado do jogador, carga, energia, esquiva, cooldown e invulnerabilidade.
 - `src/combat.ts`, `combat-effects.ts`, `spectral-effects.ts`: curvas do golpe, hitbox varrida, rastro da lâmina, flash, onda, halo e afterimages.
+- `src/crimson-wave.ts`: pool, shader, colisão varrida e regras de acerto da rajada.
+- `src/death-motion.ts`: poses capturadas, articulação, queda e repouso com contato no chão.
 - `src/enemies.ts`, `enemy-visuals.ts`, `waves.ts`: IA, arquétipos, pooling, projéteis, ondas e escolha de spawn.
 - `src/visuals.ts`: Kaeron articulado e templo procedural; `mechanics.ts` e `timing.ts`: colisões planares e simulação fixa de 60 Hz.
 
@@ -91,7 +97,7 @@ A semente padrão é 7341; `?seed=1234` reproduz outra variação de detalhes. A
 
 ## Testes e evidências
 
-Veja [o relatório 1.2](docs/1.2/TESTES.md), os JSONs em `docs/1.2/` e as capturas em [screenshots](docs/1.2/screenshots/). Os relatórios anteriores foram preservados.
+Veja [o relatório 1.3](docs/1.3/TESTES.md), os JSONs em `docs/1.3/` e as capturas em [screenshots](docs/1.3/screenshots/). Os relatórios anteriores foram preservados.
 
 ```fish
 npm test
@@ -101,6 +107,7 @@ Para os testes reais de navegador, instale Chromium (`sudo dnf install chromium`
 
 ```fish
 npm run test:browser
+npm run test:symphony
 ```
 
 Ou execute individualmente `npm run test:input`, `npm run test:movement`, `npm run test:controller`, `npm run test:combat`, `npm run test:ai`, `npm run test:waves` e `npm run test:dodge-visual`. Os runners aceitam `CHROMIUM_PATH` e `NEXUS_URL`. Para testar produção:
@@ -115,6 +122,7 @@ Em outro terminal:
 ```fish
 set -x NEXUS_URL 'http://127.0.0.1:5181/?test=1&diagnostics=1'
 npm run test:browser
+npm run test:symphony
 ```
 
 `?test=1` habilita somente inspeção e preparação de cenários. Testes de ondas usam ataques, hitboxes, vida, dano e progressão reais; não forçam mortes. Os testes isolados de IA podem iniciar uma onda escolhida, sem fingir que isso valida progressão. Gamepads são simulados via `navigator.getGamepads()`. Capturas curtas de animação usam relógio controlado, documentado no relatório. Não equivalem a benchmark de hardware ou playtest humano de balanceamento.

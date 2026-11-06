@@ -1,0 +1,10 @@
+{
+  "results": [
+    "Crimson Raider pursues, telegraphs and performs a two-hit combo",
+    "Void Archer keeps distance, renders and hits with a moving projectile",
+    "Brute slam shockwave is evaded only during the dodge window",
+    "Death cancels held charge; restart restores the wave system"
+  ],
+  "errors": [],
+  "fixture": "Opt-in starting-wave selector and positions; real AI, projectile collision, invulnerability and damage"
+}

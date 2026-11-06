@@ -1,0 +1,65 @@
+{
+  "implementationCommit": "0278e5f15132b2a5b31523edec6feb0f995ba928",
+  "unitTests": {
+    "passed": 34,
+    "failed": 0,
+    "skipped": 0
+  },
+  "productionBuild": "passed",
+  "assets": [
+    {
+      "file": "dist/assets/index-DPIMflfp.js",
+      "sha256": "05ae0a0a099098c98bcf16e76958e929d9f393ee3951c4981387485b39dbd437"
+    }
+  ],
+  "browserChecks": [
+    {
+      "artifact": "docs/1.3/regression/ai-browser.json",
+      "status": "passed",
+      "scenarios": 4
+    },
+    {
+      "artifact": "docs/1.3/regression/combat-browser.json",
+      "status": "passed",
+      "scenarios": 7
+    },
+    {
+      "artifact": "docs/1.3/regression/controller-results.json",
+      "status": "passed",
+      "scenarios": 11
+    },
+    {
+      "artifact": "docs/1.3/regression/dodge-visual.json",
+      "status": "passed",
+      "scenarios": 3
+    },
+    {
+      "artifact": "docs/1.3/regression/input-queue.json",
+      "status": "passed",
+      "scenarios": 4
+    },
+    {
+      "artifact": "docs/1.3/regression/movement-results.json",
+      "status": "passed",
+      "scenarios": null
+    },
+    {
+      "artifact": "docs/1.3/regression/waves-browser.json",
+      "status": "passed",
+      "scenarios": 3
+    },
+    {
+      "artifact": "docs/1.3/browser-results.json",
+      "status": "passed",
+      "scenarios": 6
+    },
+    {
+      "artifact": "docs/1.3/visual-results.json",
+      "status": "passed",
+      "scenarios": 2
+    }
+  ],
+  "visualInspection": "Real frame sequences inspected for all three combo attacks, charge, wave, impact, knee collapse, floor contact and rest across four enemy archetypes.",
+  "physicalGamepadsTested": false,
+  "gpuPerformanceValidated": false
+}
