@@ -1,8 +1,8 @@
 import type { Point } from "./mechanics";
 export const CUT = {
   windup: 0.05,
-  activeEnd: 0.16,
-  duration: 0.26,
+  activeEnd: 0.14,
+  duration: 0.22,
   buffer: 0.12,
   hitstop: 0.018,
 };
@@ -75,4 +75,44 @@ export function sweptBladeHits(
       [d, a],
     ].some(([p, q]) => segmentDistance(target, p, q) <= radius)
   );
+}
+
+export const COMBO = [
+  { ...CUT, name: "Swift Slash" },
+  {
+    ...CUT,
+    windup: 0.045,
+    activeEnd: 0.15,
+    duration: 0.24,
+    name: "Reverse Edge",
+  },
+  {
+    ...CUT,
+    windup: 0.075,
+    activeEnd: 0.22,
+    duration: 0.33,
+    name: "Falling Crescent",
+  },
+] as const;
+/** Opposed arcs share their endpoints; the finisher drops through a diagonal. */
+export function comboPose(
+  elapsed: number,
+  step: number,
+  profile = COMBO[0] as { windup: number; activeEnd: number; duration: number },
+) {
+  const pose = cutPose(elapsed, profile);
+  const sign = step === 1 ? -1 : 1;
+  return {
+    ...pose,
+    torso: pose.torso * sign,
+    sweep: pose.sweep * sign,
+    height:
+      step === 2
+        ? 0.75 -
+          1.35 *
+            smooth(
+              (elapsed - profile.windup) / (profile.activeEnd - profile.windup),
+            )
+        : 0.06,
+  };
 }

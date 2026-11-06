@@ -270,7 +270,7 @@ try {
   );
   assert.deepEqual(errors, []);
   await writeFile(
-    "docs/1.2/controller-results.json",
+    "docs/1.3/regression/controller-results.json",
     JSON.stringify(
       {
         results,

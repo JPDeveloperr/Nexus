@@ -1,4 +1,4 @@
-import { CUT } from "./combat";
+import { CUT, COMBO } from "./combat";
 export const HEAVY = {
   windup: 0.04,
   activeEnd: 0.22,
@@ -26,8 +26,11 @@ export class PlayerActions {
   cooldown = 0;
   buffer = 0;
   sequence = 0;
+  combo = 0;
+  private nextCombo = 0;
+  private idleTime = 0;
   get profile() {
-    return this.heavy ? HEAVY : CUT;
+    return this.heavy ? HEAVY : COMBO[this.combo];
   }
   get invulnerable() {
     return (
@@ -44,15 +47,29 @@ export class PlayerActions {
     );
   }
   get damage() {
-    return 34 * (this.heavy ? 1 + 1.5 * this.power : 1);
+    return (
+      34 * (this.heavy ? 1 + 1.5 * this.power : this.combo === 2 ? 1.3 : 1)
+    );
   }
   basic() {
-    if (this.kind === "charging") return false;
-    this.buffer = CUT.buffer;
+    if (
+      this.kind === "charging" ||
+      this.kind === "dodge" ||
+      (this.heavy && this.kind === "strike")
+    )
+      return false;
+    // Exactly one edge per strike window; never renew an already queued input.
+    if (this.buffer > 0) return false;
+    if (this.kind === "strike") {
+      if (this.elapsed < this.profile.windup) return false;
+      this.buffer = this.profile.duration - this.elapsed + CUT.buffer;
+    } else this.buffer = CUT.buffer;
     return true;
   }
+
   startCharge() {
     if (this.kind !== "idle" || this.energy < HEAVY.minCost) return false;
+    this.nextCombo = 0;
     this.kind = "charging";
     this.elapsed = 0;
     this.charge = 0;
@@ -87,6 +104,7 @@ export class PlayerActions {
       (this.kind === "strike" && this.elapsed < this.profile.activeEnd)
     )
       return false;
+    this.nextCombo = 0;
     this.kind = "dodge";
     this.elapsed = 0;
     this.buffer = 0;
@@ -97,6 +115,10 @@ export class PlayerActions {
   }
   update(dt: number, canAttack = true) {
     this.cooldown = Math.max(0, this.cooldown - dt);
+    if (this.kind === "idle") {
+      this.idleTime += dt;
+      if (this.idleTime > 0.5) this.nextCombo = 0;
+    }
     if (this.kind === "charging") {
       this.charge = Math.min(HEAVY.maxCharge, this.charge + dt);
       return;
@@ -108,6 +130,9 @@ export class PlayerActions {
         this.elapsed + 1e-9 >=
         (this.kind === "strike" ? this.profile.duration : DODGE.duration)
       ) {
+        this.nextCombo =
+          this.kind === "strike" && !this.heavy ? (this.combo + 1) % 3 : 0;
+        this.idleTime = 0;
         this.kind = "idle";
         this.elapsed = 0;
         this.charge = 0;
@@ -120,6 +145,8 @@ export class PlayerActions {
       canAttack
     ) {
       this.kind = "strike";
+      this.combo = this.nextCombo;
+      this.idleTime = 0;
       this.heavy = false;
       this.power = 0;
       this.elapsed = 0;
@@ -130,6 +157,9 @@ export class PlayerActions {
     this.buffer = Math.max(0, this.buffer - dt);
   }
   cancel() {
+    this.nextCombo = 0;
+    this.combo = 0;
+    this.idleTime = 0;
     this.kind = "idle";
     this.elapsed = 0;
     this.charge = 0;

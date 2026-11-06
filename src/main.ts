@@ -16,6 +16,7 @@ import { InputSystem } from "./input";
 import { FixedStepClock } from "./timing";
 import { CUT, cutPose, sweptBladeHits } from "./combat";
 import { CombatEffects } from "./combat-effects";
+import { CrimsonWaves, firstContact } from "./crimson-wave";
 import { PlayerActions, HEAVY, DODGE, dodgeSpeed } from "./actions";
 import { EnemySystem } from "./enemies";
 import { SpectralEffects } from "./spectral-effects";
@@ -25,12 +26,12 @@ const $ = <E extends HTMLElement = HTMLElement>(s: string) =>
   document.querySelector<E>(s)!;
 $("#interface").innerHTML = `
   <header><a class="brand" href="#" aria-label="Nexus"><span class="sigil">⟐</span><span>NEXUS<small>SHATTERED REALMS</small></span></a><div class="chapter"><span class="status-dot"></span> FRAGMENTO 01 <i></i> TEMPLO DAS RUÍNAS SUSPENSAS</div><button id="pause" class="quiet">II <span>PAUSAR</span> <kbd>ESC</kbd></button></header>
-  <section id="mission" class="hidden"><span class="eyebrow">CRIMSON FURY · QUATRO ONDAS</span><h2>O último santuário</h2><p id="objective">Derrote as sentinelas corrompidas <b>0 / 3</b></p><div class="objective-line"></div><p class="seed">◇ SEMENTE <span id="seed"></span></p></section>
+  <section id="mission" class="hidden"><span class="eyebrow">BLADE SYMPHONY · QUATRO ONDAS</span><h2>O último santuário</h2><p id="objective">Derrote as sentinelas corrompidas <b>0 / 3</b></p><div class="objective-line"></div><p class="seed">◇ SEMENTE <span id="seed"></span></p></section>
   <aside id="zone"><span class="zone-diamond">◇</span><div>RUÍNAS SUSPENSAS<small>Santuário do limiar</small></div></aside>
   <div id="crosshair">＋</div><div id="damage-flash"></div><div class="vignette"></div>
   <div id="toast" role="status"></div>
   <footer id="hud" class="hidden"><div class="vitals"><div class="identity"><span class="portrait">⟐</span><div><span class="eyebrow">ANDARILHO DIMENSIONAL</span><h3>Kaeron <small>01</small></h3></div></div><div class="bar-label"><span>VITALIDADE</span><span id="hp-text">100 / 100</span></div><div class="bar health"><div id="hp"></div></div><div class="bar-label energy-label"><span>ENERGIA</span><span id="energy-text">100 / 100</span></div><div class="bar energy"><div id="energy"></div></div></div><div class="combat"><button id="attack-button" title="Ataque leve — clique esquerdo"><span class="ability-icon">╱</span><span>CORTE DO LIMIAR</span><kbd>CLIQUE ESQUERDO</kbd><div id="cooldown"></div></button><div class="skill crimson"><span>⟐</span><strong>CRIMSON STRIKE</strong><small id="charge-text">SEGURE J / Y / △</small><div class="charge-track"><div id="charge-meter"></div></div></div><button id="dodge-button" class="skill phantom"><span>◇</span><strong>PHANTOM DODGE</strong><kbd>ESPAÇO / B / ○</kbd><small id="dodge-ready">PRONTO</small></button></div><div class="hints"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> MOVER</span><span>⌖ MOUSE PARA MIRAR</span><span><kbd>ESC</kbd> PAUSAR</span></div></footer>
-  <div id="overlay"><div class="menu-copy"><span class="eyebrow">UMA JORNADA ENTRE FRAGMENTOS</span><h1>NEXUS<span>SHATTERED REALMS</span></h1><div class="gold-rule"></div><p class="intro">O mundo se partiu.<br>A última centelha ainda resiste.</p><p class="description">Atravesse as ruínas de um reino suspenso no vazio.<br>Enfrente a corrupção. Restaure o que restou.</p><button id="start" class="primary">INICIAR JORNADA <span>→</span></button><div class="menu-controls"><span>WASD <small>MOVER</small></span><span>MOUSE <small>MIRAR E ATACAR</small></span></div><label class="quality-label">QUALIDADE GRÁFICA <select id="quality"><option value="low">Baixa</option><option value="medium" selected>Média</option><option value="high">Alta</option></select></label><label class="quality-label">DEADZONE <input id="deadzone" type="range" min="0.05" max="0.4" step="0.01" aria-label="Deadzone dos analógicos"><output id="deadzone-value"></output></label><label class="quality-label">CONTROLE ATIVO <select id="gamepad-select" aria-label="Controle ativo"><option value="auto">Automático</option></select></label></div><div class="menu-bottom"><span>VERSÃO 1.2 · CRIMSON FURY</span><span>UM MUNDO CONSTRUÍDO POR MATEMÁTICA</span></div></div>
+  <div id="overlay"><div class="menu-copy"><span class="eyebrow">UMA JORNADA ENTRE FRAGMENTOS</span><h1>NEXUS<span>SHATTERED REALMS</span></h1><div class="gold-rule"></div><p class="intro">O mundo se partiu.<br>A última centelha ainda resiste.</p><p class="description">Atravesse as ruínas de um reino suspenso no vazio.<br>Enfrente a corrupção. Restaure o que restou.</p><button id="start" class="primary">INICIAR JORNADA <span>→</span></button><div class="menu-controls"><span>WASD <small>MOVER</small></span><span>MOUSE <small>MIRAR E ATACAR</small></span></div><label class="quality-label">QUALIDADE GRÁFICA <select id="quality"><option value="low">Baixa</option><option value="medium" selected>Média</option><option value="high">Alta</option></select></label><label class="quality-label">DEADZONE <input id="deadzone" type="range" min="0.05" max="0.4" step="0.01" aria-label="Deadzone dos analógicos"><output id="deadzone-value"></output></label><label class="quality-label">CONTROLE ATIVO <select id="gamepad-select" aria-label="Controle ativo"><option value="auto">Automático</option></select></label></div><div class="menu-bottom"><span>VERSÃO 1.3 · BLADE SYMPHONY</span><span>UM MUNDO CONSTRUÍDO POR MATEMÁTICA</span></div></div>
   <div id="dialog" class="hidden" role="dialog" aria-modal="true"><div><span class="eyebrow" id="dialog-kicker"></span><h1 id="dialog-title"></h1><p id="dialog-copy"></p><button id="resume" class="primary"></button><button id="menu-button" class="secondary">VOLTAR AO MENU</button></div></div>
   <div id="input-status" role="status"></div><div id="metrics"></div>`;
 
@@ -111,6 +112,8 @@ const enemySystem = new EnemySystem(
 );
 const enemies = enemySystem.enemies;
 const actions = new PlayerActions();
+const crimsonWaves = new CrimsonWaves(scene);
+let waveSequence = -1;
 const spectral = new SpectralEffects(scene);
 const dodgeDirection = new T.Vector3();
 // Fixed-capacity particle pool; no geometry allocation during impacts.
@@ -160,7 +163,7 @@ let mode: Mode = "menu",
 let attackBuffered = 0,
   hitstop = 0,
   attackSequence = 0;
-const hitTargets = new Set<number>();
+let hitTargets = new Set<number>();
 let previousBlade = player.bladeSample();
 const combatEvents: Record<string, unknown>[] = [];
 function recordCombat(event: Record<string, unknown>) {
@@ -270,6 +273,8 @@ function reset(wave = 1) {
   player.root.rotation.set(0, Math.PI, 0);
   cameraTarget.set(0, 0, -1);
   actions.reset();
+  crimsonWaves.reset();
+  waveSequence = -1;
   enemySystem.reset(player.root.position, wave - 1);
   spectral.reset();
   combatEvents.length = 0;
@@ -324,13 +329,14 @@ function lockFacing() {
     );
 }
 function actionStarted() {
-  hitTargets.clear();
+  hitTargets = new Set<number>();
   attackSequence = actions.sequence;
   lockFacing();
   previousBlade = player.bladeSample();
   effects.color(actions.heavy);
   recordCombat({
     kind: "start",
+    combo: actions.combo,
     heavy: actions.heavy,
     power: actions.power,
     damage: actions.damage,
@@ -350,9 +356,13 @@ function receiveDamage(amount: number, source: string) {
   shake = 0.13;
   burst(player.root.position, true);
   sound(80, 0.15, 0.03);
-  if (actions.kind === "charging") {
+  if (actions.kind === "charging" || actions.kind === "strike") {
+    const charging = actions.kind === "charging";
     actions.cancel();
-    recordCombat({ kind: "chargeCancel", reason: "damage" });
+    recordCombat({
+      kind: charging ? "chargeCancel" : "strikeCancel",
+      reason: "damage",
+    });
   }
   recordCombat({ kind: "receivedDamage", amount, source });
   if (health === 0) setMode("defeat");
@@ -517,10 +527,20 @@ function simulate(dt: number) {
         new T.Vector2(direction.x * speed, direction.z * speed),
         1 - Math.exp(-14 * dt),
       );
+    const lunge =
+      actions.kind === "strike" &&
+      !actions.heavy &&
+      actions.combo === 2 &&
+      actions.active
+        ? 1.6
+        : 0;
     const before = player.root.position.clone();
     const next = moveCircle(
       before,
-      { x: velocity.x * dt, z: velocity.y * dt },
+      {
+        x: (velocity.x + Math.sin(player.root.rotation.y) * lunge) * dt,
+        z: (velocity.y + Math.cos(player.root.rotation.y) * lunge) * dt,
+      },
       PLAYER_RADIUS,
       temple.obstacles.concat(enemySystem.blockers()),
     );
@@ -559,6 +579,7 @@ function simulate(dt: number) {
       charge,
       heavy: actions.kind === "strike" && actions.heavy,
       dodge: actions.kind === "dodge" ? actions.elapsed : -1,
+      combo: actions.combo,
     });
     const blade = player.bladeSample();
     if (actions.active) {
@@ -583,6 +604,7 @@ function simulate(dt: number) {
             actions.heavy,
             actions.power,
             player.root.position,
+            !actions.heavy && actions.combo === 2 ? 1.4 : 1,
           );
           if (damage <= 0) continue;
           hitTargets.add(e.id);
@@ -613,6 +635,69 @@ function simulate(dt: number) {
           }
         }
     }
+    if (
+      actions.kind === "strike" &&
+      actions.heavy &&
+      actions.elapsed >= 0.13 &&
+      waveSequence !== actions.sequence
+    ) {
+      waveSequence = actions.sequence;
+      const origin = blade.base.clone().lerp(blade.tip, 0.45);
+      const clear = temple.obstacles.every(
+        (o) =>
+          firstContact(player.root.position, origin, o, o.radius + 0.12) > 1,
+      );
+      if (
+        clear &&
+        crimsonWaves.launch(
+          origin,
+          player.root.rotation.y,
+          actions.power,
+          hitTargets,
+        )
+      ) {
+        effects.impact(origin);
+        burst(origin, true);
+        recordCombat({
+          kind: "waveLaunch",
+          power: actions.power,
+          x: origin.x,
+          z: origin.z,
+        });
+      }
+    }
+    crimsonWaves.update(
+      dt,
+      temple.obstacles,
+      enemySystem.alive
+        .filter((e) => e.state !== "spawn")
+        .map((e) => ({
+          id: e.id,
+          x: e.body.root.position.x,
+          z: e.body.root.position.z,
+          radius: e.kind === "brute" ? 0.85 : 0.5,
+        })),
+      (id, power, w) => {
+        const e = enemies.find((e) => e.id === id)!;
+        const origin = new T.Vector3(w.x - w.dx, 0, w.z - w.dz);
+        const damage = enemySystem.hit(
+          e,
+          34 * (1 + 1.5 * power),
+          true,
+          power * 0.45,
+          origin,
+        );
+        if (damage <= 0) return false;
+        effects.impact(e.body.root.position);
+        burst(e.body.root.position, true);
+        recordCombat({ kind: "waveHit", target: id, damage, power });
+        if (e.hp === 0) {
+          kills++;
+          recordCombat({ kind: "enemyDeath", target: id, archetype: e.kind });
+        }
+        return true;
+      },
+    );
     previousBlade = blade;
     hurt = Math.max(0, hurt - dt);
     energy = actions.energy;
@@ -648,6 +733,8 @@ function simulate(dt: number) {
     follow.z -= 1.5;
     cameraTarget.lerp(follow, 1 - Math.exp(-3 * dt));
     updateHUD();
+  } else if (mode === "victory" || mode === "defeat") {
+    enemySystem.updateCorpses(dt);
   } else if (mode === "menu") {
     player.animate(time, 0, 0, 0);
     enemies.forEach((e) => {
@@ -770,6 +857,7 @@ if (params.has("test")) {
         attack,
         action: {
           kind: actions.kind,
+          combo: actions.combo,
           heavy: actions.heavy,
           elapsed: actions.elapsed,
           charge: actions.charge,
@@ -779,6 +867,27 @@ if (params.has("test")) {
           invulnerable: actions.invulnerable,
         },
         world: enemySystem.snapshot(),
+        crimsonWaves: crimsonWaves.snapshot(),
+        poses: {
+          player: {
+            torso: player.torso.rotation.toArray(),
+            arm: player.rightArm.rotation.toArray(),
+            knee: player.leftShin.rotation.x,
+          },
+          enemies: enemies
+            .filter((e) => e.state === "dead")
+            .map((e) => ({
+              id: e.id,
+              positions: (() => {
+                const points: number[][] = [];
+                e.body.root.traverse((o) => {
+                  if (o.type === "Group")
+                    points.push(o.getWorldPosition(new T.Vector3()).toArray());
+                });
+                return points;
+              })(),
+            })),
+        },
         updateMs,
         bladeColor: (
           player.blade.material as T.MeshStandardMaterial
@@ -813,6 +922,11 @@ if (params.has("test")) {
         if (!Number.isInteger(wave) || wave < 1 || wave > 4)
           throw Error("Invalid test wave");
         reset(wave);
+      },
+      faceEnemy: (id: number, angle: number) => {
+        const e = enemies.find((e) => e.id === id);
+        if (!e) throw Error("Unknown enemy");
+        e.body.root.rotation.y = angle;
       },
       placeEnemy: (id: number, x: number, z: number) => {
         const e = enemies.find((e) => e.id === id);

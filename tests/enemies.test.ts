@@ -78,7 +78,7 @@ test("strong attacks interrupt archer, brute recovery is vulnerable, death retur
   brute.state = "chase";
   system.hit(brute, 1000, true, 1, player);
   assert.equal(brute.state, "dead");
-  for (let i = 0; i < 80; i++)
+  for (let i = 0; i < 180; i++)
     system.update({
       dt: 1 / 60,
       time: i / 60,

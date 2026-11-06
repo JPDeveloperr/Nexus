@@ -1,5 +1,5 @@
 import * as T from "three";
-import { cutPose, CUT } from "./combat";
+import { cutPose, comboPose, CUT } from "./combat";
 import { seededRandom, type Obstacle } from "./mechanics";
 
 const metal = new T.MeshStandardMaterial({
@@ -125,15 +125,36 @@ function shell(
 }
 export class Warrior {
   root = new T.Group();
+  pelvis = new T.Group();
   torso = new T.Group();
   head = new T.Group();
   leftArm = new T.Group();
   rightArm = new T.Group();
   leftLeg = new T.Group();
   rightLeg = new T.Group();
+  leftShin = new T.Group();
+  rightShin = new T.Group();
   leftForearm = new T.Group();
   rightForearm = new T.Group();
   sword = new T.Group();
+  private animationJoints = [
+    this.pelvis,
+    this.torso,
+    this.head,
+    this.leftArm,
+    this.rightArm,
+    this.leftForearm,
+    this.rightForearm,
+    this.leftLeg,
+    this.rightLeg,
+    this.leftShin,
+    this.rightShin,
+    this.sword,
+  ];
+  private previousPoses = this.animationJoints.map((j) => ({
+    q: j.quaternion.clone(),
+    p: j.position.clone(),
+  }));
   private gait = 0;
   private movementBlend = 0;
   blade: T.Mesh;
@@ -142,8 +163,9 @@ export class Warrior {
   aura: T.Mesh;
   constructor(public corrupted = false) {
     const glow = corrupted ? red : cyan;
-    shell(this.root, dark, 0.31, 0.3, 0.38, 0, 1.02, 0);
-    this.root.add(this.torso);
+    this.root.add(this.pelvis);
+    shell(this.pelvis, dark, 0.31, 0.3, 0.38, 0, 1.02, 0);
+    this.pelvis.add(this.torso);
     this.torso.position.y = 1.35;
     shell(this.torso, metal, 0.49, 0.32, 0.66, 0, 0.03, 0);
     for (let i = 0; i < 3; i++) {
@@ -231,12 +253,15 @@ export class Warrior {
       [this.leftLeg, -1],
       [this.rightLeg, 1],
     ] as const) {
-      this.root.add(limb);
+      this.pelvis.add(limb);
       limb.position.set(sign * 0.21, 0.96, 0);
       shell(limb, metal, 0.22, 0.17, 0.43, 0, -0.2, 0);
       mesh(new T.OctahedronGeometry(0.21), edge, limb, 0, -0.43, 0.055);
-      shell(limb, metal, 0.18, 0.13, 0.38, 0, -0.63, 0);
-      const foot = shell(limb, dark, 0.16, 0.22, 0.17, 0, -0.86, 0.09);
+      const shin = sign === 1 ? this.rightShin : this.leftShin;
+      limb.add(shin);
+      shin.position.y = -0.43;
+      shell(shin, metal, 0.18, 0.13, 0.38, 0, -0.2, 0);
+      const foot = shell(shin, dark, 0.16, 0.22, 0.17, 0, -0.43, 0.09);
       foot.scale.z = 1.25;
     }
     // Sword silhouette is an extruded, bevelled profile attached to the hand.
@@ -332,8 +357,21 @@ export class Warrior {
       charge: number;
       heavy: boolean;
       dodge: number;
+      combo?: number;
     },
   ) {
+    const joints = this.animationJoints,
+      previousPoses = this.previousPoses;
+    if (!this.corrupted)
+      joints.forEach((j, i) => {
+        previousPoses[i].q.copy(j.quaternion);
+        previousPoses[i].p.copy(j.position);
+      });
+    this.pelvis.rotation.set(0, 0, 0);
+    this.leftShin.rotation.set(0, 0, 0);
+    this.rightShin.rotation.set(0, 0, 0);
+    this.head.rotation.set(0, 0, 0);
+    this.leftLeg.rotation.z = this.rightLeg.rotation.z = 0;
     this.gait += speed * dt * 2.5;
     this.movementBlend +=
       (Math.min(1, speed / 4.5) - this.movementBlend) *
@@ -350,6 +388,8 @@ export class Warrior {
       1.35 + Math.sin(t * 2) * 0.018 + Math.abs(stride) * 0.045 * run;
     this.leftLeg.rotation.x = stride * 0.65 * run;
     this.rightLeg.rotation.x = -stride * 0.65 * run;
+    this.leftShin.rotation.x = Math.max(0, -stride) * 0.55 * run;
+    this.rightShin.rotation.x = Math.max(0, stride) * 0.55 * run;
     this.leftArm.rotation.x = -stride * 0.45 * run - 0.12;
     this.rightArm.rotation.x = stride * 0.38 * run - 0.18;
     this.rightArm.rotation.z = -0.08;
@@ -364,23 +404,39 @@ export class Warrior {
       const pose =
           (action?.charge || 0) > 0
             ? cutPose(CUT.windup * 0.98)
-            : cutPose(
+            : comboPose(
                 action?.elapsed ?? CUT.duration - attack,
+                action?.combo ?? 0,
                 action?.profile,
               ),
         blend = pose.blend;
-      this.torso.rotation.y = pose.torso;
+      this.pelvis.rotation.y = pose.torso * 0.18;
+      this.torso.rotation.y = pose.torso * 0.82;
+      const tension = action?.charge || 0;
+      const drop =
+        action?.combo === 2
+          ? Math.sin(
+              Math.PI * Math.min(1, action.elapsed / action.profile.duration),
+            )
+          : 0;
+      this.torso.rotation.x = -0.08 - tension * 0.18 + drop * 0.22;
+      this.torso.position.y -= 0.09 * blend + tension * 0.08;
+      this.leftLeg.rotation.x -= 0.16 * blend + drop * 0.12;
+      this.rightLeg.rotation.x += 0.2 * blend;
+      this.leftShin.rotation.x += 0.22 * blend;
+      this.rightShin.rotation.x += 0.18 * blend;
+      this.head.rotation.y = -pose.torso * 0.3;
       this.rightArm.rotation.x = T.MathUtils.lerp(
         this.rightArm.rotation.x,
-        -1.25,
+        -1.25 - tension * 0.2,
         blend,
       );
       this.rightArm.rotation.z = T.MathUtils.lerp(-0.08, -0.72, blend);
-      this.rightForearm.rotation.x = -0.45 * blend;
+      this.rightForearm.rotation.x = -(0.45 + tension * 0.25) * blend;
       this.root.updateWorldMatrix(true, true);
       const desired = new T.Vector3(
         Math.sin(pose.sweep * (action?.heavy ? 1.18 : 1)),
-        0.06,
+        "height" in pose ? Number(pose.height) : 0.06,
         Math.cos(pose.sweep * (action?.heavy ? 1.18 : 1)),
       ).normalize();
       const rootQ = this.root.getWorldQuaternion(new T.Quaternion());
@@ -455,9 +511,14 @@ export class Warrior {
       }
     }
     this.torso.rotation.z = hurt > 0 ? Math.sin(hurt * 35) * 0.14 : 0;
-    this.root.rotation.z = dead
-      ? Math.min(1.4, this.root.rotation.z + 0.05)
-      : 0;
+    this.root.rotation.z = 0; // Death is owned by the articulated death controller.
+    if (!this.corrupted) {
+      const alpha = 1 - Math.exp(-55 * dt);
+      joints.forEach((j, i) => {
+        j.quaternion.copy(previousPoses[i].q.slerp(j.quaternion, alpha));
+        j.position.lerpVectors(previousPoses[i].p, j.position, alpha);
+      });
+    }
     const a = this.cape.geometry.attributes.position;
     for (let i = 0; i < a.count; i++) {
       const y = a.getY(i),

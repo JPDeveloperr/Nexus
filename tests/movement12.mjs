@@ -108,7 +108,7 @@ try {
   );
   assert.deepEqual(errors, []);
   await writeFile(
-    "docs/1.2/movement-results.json",
+    "docs/1.3/regression/movement-results.json",
     JSON.stringify(
       {
         records,

@@ -10,7 +10,7 @@ const b = await chromium.launch({
     "--use-angle=swiftshader",
   ],
 });
-const p = await b.newPage({ viewport: { width: 960, height: 600 } });
+const p = await b.newPage({ viewport: { width: 640, height: 480 } });
 const errors = [];
 p.on("pageerror", (e) => errors.push(e.message));
 p.on("console", (m) => {
@@ -56,13 +56,13 @@ try {
   const start = await p.evaluate(() => window.__nexus.snapshot());
   await p.keyboard.press("Space");
   await p.evaluate(() => tick(2));
-  await p.screenshot({ path: "docs/1.2/screenshots/phantom-01-start.png" });
+  await p.screenshot({ path: "docs/1.3/regression/screenshots/phantom-01-start.png" });
   await p.evaluate(() => tick(5));
   assert.ok(
     (await p.evaluate(() => window.__nexus.snapshot())).action.invulnerable,
   );
   await p.screenshot({
-    path: "docs/1.2/screenshots/phantom-02-displacement.png",
+    path: "docs/1.3/regression/screenshots/phantom-02-displacement.png",
   });
   await p.evaluate(() => tick(15));
   const end = await p.evaluate(() => window.__nexus.snapshot());
@@ -71,10 +71,10 @@ try {
     Math.hypot(end.player.x - start.player.x, end.player.z - start.player.z) >
       2,
   );
-  await p.screenshot({ path: "docs/1.2/screenshots/phantom-03-recovery.png" });
+  await p.screenshot({ path: "docs/1.3/regression/screenshots/phantom-03-recovery.png" });
   assert.deepEqual(errors, []);
   await writeFile(
-    "docs/1.2/dodge-visual.json",
+    "docs/1.3/regression/dodge-visual.json",
     JSON.stringify(
       {
         results: [

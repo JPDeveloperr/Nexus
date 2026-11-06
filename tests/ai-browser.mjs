@@ -10,7 +10,7 @@ const browser = await chromium.launch({
     "--use-angle=swiftshader",
   ],
 });
-const page = await browser.newPage({ viewport: { width: 960, height: 600 } });
+const page = await browser.newPage({ viewport: { width: 640, height: 480 } });
 const errors = [],
   results = [];
 page.on("pageerror", (e) => errors.push(e.message));
@@ -107,7 +107,7 @@ try {
         if (s.world.projectiles.length) {
           observed = true;
           await page.screenshot({
-            path: "docs/1.2/screenshots/void-archer-projectile.png",
+            path: "docs/1.3/regression/screenshots/void-archer-projectile.png",
           });
         }
         if (
@@ -142,7 +142,7 @@ try {
         if (s.world.shocks.some((w) => w.radius > 1.15 && w.radius < 1.8)) {
           saw = true;
           await page.screenshot({
-            path: "docs/1.2/screenshots/obsidian-brute-slam.png",
+            path: "docs/1.3/regression/screenshots/obsidian-brute-slam.png",
           });
           break;
         }
@@ -160,7 +160,7 @@ try {
         JSON.stringify(s),
       );
       await page.screenshot({
-        path: "docs/1.2/screenshots/phantom-shockwave-evade.png",
+        path: "docs/1.3/regression/screenshots/phantom-shockwave-evade.png",
       });
       await tick(8);
       assert.equal((await snap()).action.invulnerable, false);
@@ -204,7 +204,7 @@ try {
   );
   assert.deepEqual(errors, []);
   await writeFile(
-    "docs/1.2/ai-browser.json",
+    "docs/1.3/regression/ai-browser.json",
     JSON.stringify(
       {
         results,
@@ -219,7 +219,7 @@ try {
 } catch (e) {
   console.error(e);
   await writeFile(
-    "docs/1.2/ai-failure.json",
+    "docs/1.3/regression/ai-failure.json",
     JSON.stringify(
       { results, errors, error: String(e), state: await snap() },
       null,

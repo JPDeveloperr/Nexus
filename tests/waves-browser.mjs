@@ -143,7 +143,7 @@ try {
           !waveHistory.find((w) => w.wave === s.world.wave).screenshot
         ) {
           await page.screenshot({
-            path: `docs/1.2/screenshots/wave-${s.world.wave}.png`,
+            path: `docs/1.3/regression/screenshots/wave-${s.world.wave}.png`,
           });
           waveHistory.find((w) => w.wave === s.world.wave).screenshot = true;
         }
@@ -184,7 +184,7 @@ try {
     },
   );
   await page.screenshot({
-    path: "docs/1.2/screenshots/four-waves-victory.png",
+    path: "docs/1.3/regression/screenshots/four-waves-victory.png",
   });
   await pass(
     "Restart restores first wave, health/energy, charge, dodge and hazard pools",
@@ -204,7 +204,7 @@ try {
   );
   assert.deepEqual(errors, []);
   await writeFile(
-    "docs/1.2/waves-browser.json",
+    "docs/1.3/regression/waves-browser.json",
     JSON.stringify(
       {
         results,
@@ -224,14 +224,14 @@ try {
 } catch (e) {
   console.error(e);
   await writeFile(
-    "docs/1.2/waves-failure.json",
+    "docs/1.3/regression/waves-failure.json",
     JSON.stringify(
       { results, errors, waveHistory, error: String(e), state: await snap() },
       null,
       2,
     ),
   );
-  await page.screenshot({ path: "docs/1.2/screenshots/waves-failure.png" });
+  await page.screenshot({ path: "docs/1.3/regression/screenshots/waves-failure.png" });
   throw e;
 } finally {
   await browser.close();

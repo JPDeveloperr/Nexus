@@ -1,4 +1,6 @@
 import * as T from "three";
+import { Warrior } from "./visuals";
+import { DeathMotion, DEATH_DURATION } from "./death-motion";
 import { createEnemyBody, type EnemyBody } from "./enemy-visuals";
 import {
   WaveDirector,
@@ -64,6 +66,7 @@ export type EnemyState =
   | "hurt"
   | "dead";
 export type Enemy = {
+  death?: DeathMotion;
   id: number;
   kind: Archetype;
   body: EnemyBody;
@@ -134,6 +137,19 @@ export class EnemySystem {
     ];
     kinds.forEach((kind, id) => {
       const body = createEnemyBody(kind);
+      // Independent pooled materials let a corpse fade without fading living actors.
+      const materials = new Map<T.Material, T.Material>();
+      body.root.traverse((o) => {
+        if (o instanceof T.Mesh) {
+          const clone = (m: T.Material) => {
+            if (!materials.has(m)) materials.set(m, m.clone());
+            return materials.get(m)!;
+          };
+          o.material = Array.isArray(o.material)
+            ? o.material.map(clone)
+            : clone(o.material);
+        }
+      });
       scene.add(body.root);
       body.root.visible = false;
       const telegraph = new T.Mesh(
@@ -238,6 +254,8 @@ export class EnemySystem {
     this.nextAttack = 0;
     this.spawnSerial = 0;
     for (const e of this.enemies) {
+      e.death?.restore();
+      e.death = undefined;
       e.state = "inactive";
       e.hp = 0;
       e.timer = 0;
@@ -270,6 +288,8 @@ export class EnemySystem {
     );
     if (!point) return false;
     this.spawnSerial++;
+    e.death?.restore();
+    e.death = undefined;
     e.hp = ENEMY_STATS[kind].hp;
     e.state = "spawn";
     e.timer = 0;
@@ -292,6 +312,7 @@ export class EnemySystem {
     heavy: boolean,
     power: number,
     origin: T.Vector3,
+    knockScale = 1,
   ) {
     if (e.state === "inactive" || e.state === "dead" || e.state === "spawn")
       return 0;
@@ -315,17 +336,36 @@ export class EnemySystem {
     e.knock
       .set(vector.x, vector.z)
       .multiplyScalar(
-        (heavy ? 6 + power * 4 : 3) / (e.kind === "brute" ? 2.8 : 1),
+        (knockScale * (heavy ? 6 + power * 4 : 3)) /
+          (e.kind === "brute" ? 2.8 : 1),
       );
     if (e.hp === 0) {
       e.state = "dead";
       e.timer = 0;
+      e.death = new DeathMotion(
+        e.body,
+        e.kind,
+        vector,
+        this.spawnSerial + e.id,
+      );
+      e.hit = true;
     } else if (heavy || e.kind === "sentinel" || e.kind === "raider") {
       e.state = "hurt";
       e.timer = 0;
     }
     e.telegraph.visible = e.beam.visible = false;
     return applied;
+  }
+  updateCorpses(dt: number) {
+    for (const e of this.enemies)
+      if (e.state === "dead") {
+        e.timer += dt;
+        e.death?.update(e.timer);
+        if (e.timer + 1e-9 >= DEATH_DURATION) {
+          e.state = "inactive";
+          e.body.root.visible = false;
+        }
+      }
   }
   update(ctx: Context) {
     const { dt, time, player } = ctx;
@@ -337,9 +377,8 @@ export class EnemySystem {
       e.hurt = Math.max(0, e.hurt - dt);
       if (e.state === "dead") {
         e.telegraph.visible = e.beam.visible = false;
-        e.body.animate(time, 0, 0, 0, true);
-        p.y -= dt * 0.4;
-        if (e.timer > 1.2) {
+        e.death?.update(e.timer);
+        if (e.timer + 1e-9 >= DEATH_DURATION) {
           e.state = "inactive";
           e.body.root.visible = false;
         }
@@ -504,6 +543,18 @@ export class EnemySystem {
         e.state === "attack" ? 0.52 * (1 - e.timer / stats.attack) : 0,
         e.hurt,
       );
+      if (e.hurt > 0 && e.body instanceof Warrior) {
+        const local = new T.Vector3(e.knock.x, 0, e.knock.y)
+          .normalize()
+          .applyAxisAngle(new T.Vector3(0, 1, 0), -e.body.root.rotation.y);
+        const recoil = Math.sin(Math.PI * (1 - e.hurt / 0.3)) * 0.28;
+        e.body.torso.rotation.x += local.z * recoil;
+        e.body.torso.rotation.z -= local.x * recoil;
+        e.body.head.rotation.x = -local.z * recoil * 0.65;
+        e.body.head.rotation.z = local.x * recoil * 0.5;
+        e.body.leftArm.rotation.x -= recoil * 0.6;
+        e.body.rightArm.rotation.x -= recoil * 0.6;
+      }
     }
     this.updateHazards(ctx);
     const prior = this.director.state;
@@ -616,6 +667,9 @@ export class EnemySystem {
         hp: e.hp,
         state: e.state,
         timer: e.timer,
+        deathVariant: e.death?.variant,
+        floor: e.death?.floor,
+        y: e.body.root.position.y,
         x: e.body.root.position.x,
         z: e.body.root.position.z,
         radius: ENEMY_STATS[e.kind].radius,

@@ -224,11 +224,8 @@ class Archer implements EnemyBody {
     });
     this.bow.rotation.x =
       a > 0 ? Math.sin(a * 10) * 0.3 : Math.sin(t * 2) * 0.04;
-    this.root.rotation.z = d
-      ? Math.min(1.4, this.root.rotation.z + 0.05)
-      : h > 0
-        ? Math.sin(h * 30) * 0.15
-        : 0;
+    this.root.rotation.z = h > 0 ? Math.sin(h * 30) * 0.15 : 0;
+    // DeathMotion owns loss of lift, fragment spread and floor contact.
   }
 }
 export function createEnemyBody(kind: Archetype): EnemyBody {

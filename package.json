@@ -1,13 +1,13 @@
 {
   "name": "nexus-shattered-realms",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "test": "node --import tsx tests/mechanics.test.ts && node --import tsx tests/enemies.test.ts",
+    "test": "node --import tsx tests/mechanics.test.ts && node --import tsx tests/enemies.test.ts && node --import tsx tests/symphony.test.ts",
     "test:browser": "npm run test:input && npm run test:movement && npm run test:controller && npm run test:combat && npm run test:ai && npm run test:waves && npm run test:dodge-visual",
     "test:movement": "node tests/movement12.mjs",
     "test:controller": "node tests/controller12.mjs",
@@ -15,7 +15,8 @@
     "test:waves": "node tests/waves-browser.mjs",
     "test:ai": "node tests/ai-browser.mjs",
     "test:input": "node tests/input-queue.mjs",
-    "test:dodge-visual": "node tests/dodge-visual.mjs"
+    "test:dodge-visual": "node tests/dodge-visual.mjs",
+    "test:symphony": "node tests/symphony-browser.mjs"
   },
   "dependencies": {
     "three": "0.180.0"

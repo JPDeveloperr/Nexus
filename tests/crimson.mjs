@@ -10,7 +10,7 @@ const browser = await chromium.launch({
     "--use-angle=swiftshader",
   ],
 });
-const page = await browser.newPage({ viewport: { width: 960, height: 600 } });
+const page = await browser.newPage({ viewport: { width: 640, height: 480 } });
 const errors = [],
   results = [];
 page.on("pageerror", (e) => errors.push(e.message));
@@ -42,6 +42,8 @@ const tick = (n, ms = 1000 / 60) =>
   page.evaluate(([n, ms]) => window.tickFrames(n, ms), [n, ms]);
 const snap = () => page.evaluate(() => window.__nexus.snapshot());
 async function pass(name, fn) {
+  if (process.env.NEXUS_CASE && !new RegExp(process.env.NEXUS_CASE).test(name))
+    return;
   await fn();
   results.push(name);
   console.log("PASS", name);
@@ -76,7 +78,7 @@ try {
   await page.locator("#start").click({ force: true });
   await tick(1);
   await isolate();
-  await pass("Basic is 260ms, buffered, and returns to movement", async () => {
+  await pass("Basic is 220ms, buffered, and returns to movement", async () => {
     await basic();
     await tick(1);
     const a = await snap();
@@ -106,12 +108,12 @@ try {
       assert.equal(early.action.kind, "charging");
       assert.notEqual(early.bladeColor, original);
       await page.screenshot({
-        path: "docs/1.2/screenshots/charge-01-early.png",
+        path: "docs/1.3/regression/screenshots/charge-01-early.png",
       });
       await tick(26);
       const middle = await snap();
       await page.screenshot({
-        path: "docs/1.2/screenshots/charge-02-middle.png",
+        path: "docs/1.3/regression/screenshots/charge-02-middle.png",
       });
       await tick(44);
       const maximum = await snap();
@@ -121,7 +123,7 @@ try {
           ((maximum.bladeColor >> 8) & 255) * 3,
       );
       await page.screenshot({
-        path: "docs/1.2/screenshots/charge-03-maximum.png",
+        path: "docs/1.3/regression/screenshots/charge-03-maximum.png",
       });
       await page.keyboard.up("KeyJ");
       await tick(7);
@@ -130,7 +132,7 @@ try {
       assert.equal(released.action.heavy, true);
       assert.equal(released.action.power, 1);
       await page.screenshot({
-        path: "docs/1.2/screenshots/crimson-04-release.png",
+        path: "docs/1.3/regression/screenshots/crimson-04-release.png",
       });
       await tick(38);
       released = await snap();
@@ -226,7 +228,7 @@ try {
       await page.keyboard.press("Space");
       await tick(6);
       await page.screenshot({
-        path: "docs/1.2/screenshots/dodge-01-displacement.png",
+        path: "docs/1.3/regression/screenshots/dodge-01-displacement.png",
       });
       await tick(16);
       let s = await snap();
@@ -244,7 +246,7 @@ try {
         assert.ok(Math.hypot(s.player.x, s.player.z + 12.8) >= 1.38);
       }
       await page.screenshot({
-        path: "docs/1.2/screenshots/dodge-02-column.png",
+        path: "docs/1.3/regression/screenshots/dodge-02-column.png",
       });
       await page.evaluate(() => window.__nexus.inspect(1));
     },
@@ -265,17 +267,17 @@ try {
       await page.keyboard.press("Space");
       await tick(2);
       await page.screenshot({
-        path: "docs/1.2/screenshots/phantom-01-start.png",
+        path: "docs/1.3/regression/screenshots/phantom-01-start.png",
       });
       await tick(5);
       assert.equal((await snap()).action.invulnerable, true);
       await page.screenshot({
-        path: "docs/1.2/screenshots/phantom-02-displacement.png",
+        path: "docs/1.3/regression/screenshots/phantom-02-displacement.png",
       });
       await tick(15);
       assert.equal((await snap()).action.invulnerable, false);
       await page.screenshot({
-        path: "docs/1.2/screenshots/phantom-03-recovery.png",
+        path: "docs/1.3/regression/screenshots/phantom-03-recovery.png",
       });
       await page.evaluate(() => {
         window.__nexus.inspect(1);
@@ -284,7 +286,7 @@ try {
     },
   );
   await pass(
-    "Blade hitbox and heavy damage scale through real attacks",
+    "Blade hitbox and shared heavy/wave damage scale without stacking",
     async () => {
       await tick(45);
       await page.evaluate(() => {
@@ -315,7 +317,17 @@ try {
         await page.keyboard.up("KeyJ");
         await tick(40);
         s = await snap();
-        const hit = s.combatEvents.find((e) => e.kind === "hit" && e.heavy);
+        const contacts = s.combatEvents.filter(
+          (e) =>
+            e.target === 0 &&
+            ((e.kind === "hit" && e.heavy) || e.kind === "waveHit"),
+        );
+        assert.equal(
+          contacts.length,
+          1,
+          "melee and wave must share a single damage application",
+        );
+        const hit = contacts[0];
         assert.ok(hit, JSON.stringify(s));
         damage.push(hit.damage);
       }
@@ -325,7 +337,7 @@ try {
   );
   assert.deepEqual(errors, []);
   await writeFile(
-    "docs/1.2/combat-browser.json",
+    "docs/1.3/regression/combat-browser.json",
     JSON.stringify(
       {
         results,
@@ -339,9 +351,11 @@ try {
   );
 } catch (e) {
   console.error(e);
-  await page.screenshot({ path: "docs/1.2/screenshots/test-failure.png" });
+  await page.screenshot({
+    path: "docs/1.3/regression/screenshots/test-failure.png",
+  });
   await writeFile(
-    "docs/1.2/combat-failure.json",
+    "docs/1.3/regression/combat-failure.json",
     JSON.stringify(
       { results, errors, error: String(e), state: await snap() },
       null,

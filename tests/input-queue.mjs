@@ -116,7 +116,7 @@ try {
   );
   assert.deepEqual(errors, []);
   await writeFile(
-    "docs/1.2/input-queue.json",
+    "docs/1.3/regression/input-queue.json",
     JSON.stringify(
       {
         results: [
