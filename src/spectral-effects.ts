@@ -2,6 +2,7 @@ import * as T from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 export class SpectralEffects {
   private positions = new Float32Array(40 * 3);
+  private particleAlpha = new Float32Array(40);
   private points: T.Points;
   private halo: T.Mesh;
   private light: T.PointLight;
@@ -11,6 +12,10 @@ export class SpectralEffects {
   constructor(scene: T.Scene) {
     const geometry = new T.BufferGeometry();
     geometry.setAttribute("position", new T.BufferAttribute(this.positions, 3));
+    geometry.setAttribute(
+      "particleAlpha",
+      new T.BufferAttribute(this.particleAlpha, 1),
+    );
     this.points = new T.Points(
       geometry,
       new T.ShaderMaterial({
@@ -19,9 +24,9 @@ export class SpectralEffects {
         blending: T.AdditiveBlending,
         uniforms: { power: { value: 0 } },
         vertexShader:
-          "uniform float power;void main(){vec4 p=modelViewMatrix*vec4(position,1.);gl_PointSize=clamp(180.*(.4+power)/-p.z,1.,7.);gl_Position=projectionMatrix*p;}",
+          "attribute float particleAlpha;varying float vAlpha;uniform float power;void main(){vAlpha=particleAlpha;vec4 p=modelViewMatrix*vec4(position,1.);gl_PointSize=clamp(180.*(.4+power)/-p.z,1.,7.);gl_Position=projectionMatrix*p;}",
         fragmentShader:
-          "uniform float power;void main(){float a=smoothstep(.5,.05,length(gl_PointCoord-.5));gl_FragColor=vec4(1.,.04+.15*power,.16,a*.8);}",
+          "varying float vAlpha;uniform float power;void main(){float a=smoothstep(.5,.05,length(gl_PointCoord-.5));gl_FragColor=vec4(1.,.04+.15*power,.16,a*.8*vAlpha);}",
       }),
     );
     this.points.frustumCulled = false;
@@ -33,7 +38,11 @@ export class SpectralEffects {
         depthWrite: false,
         blending: T.AdditiveBlending,
         side: T.DoubleSide,
-        uniforms: { power: { value: 0 }, time: { value: 0 }, tint:{value:new T.Color(0xff0420)} },
+        uniforms: {
+          power: { value: 0 },
+          time: { value: 0 },
+          tint: { value: new T.Color(0xff0420) },
+        },
         vertexShader:
           "varying vec2 vUv;uniform float time;uniform float power;void main(){vUv=uv;vec3 p=position+normal*sin(position.y*24.+time*16.)*.025*power;gl_Position=projectionMatrix*modelViewMatrix*vec4(p,1.);}",
         fragmentShader:
@@ -81,13 +90,16 @@ export class SpectralEffects {
     dodging: boolean,
     root: T.Group,
   ) {
-    this.points.visible=charge>0;this.halo.visible=charge>0||dodging;
+    this.points.visible = charge > 0;
+    this.halo.visible = charge > 0 || dodging;
     this.light.intensity = charge * 10;
     if (charge > 0) {
       for (let i = 0; i < 40; i++) {
         const t = (i * 0.6180339) % 1,
           a = time * (6 + charge * 5) + i * 2.4,
-          r = 0.15 + charge * 0.14;
+          phase = (time * 1.2 + i * 0.137) % 1,
+          r = 0.04 + 0.55 * (1 - phase) ** 2 * (1 - charge * 0.4);
+        this.particleAlpha[i] = Math.sin(Math.PI * phase);
         this.positions[i * 3] =
           T.MathUtils.lerp(base.x, tip.x, t) + Math.cos(a) * r;
         this.positions[i * 3 + 1] =
@@ -96,6 +108,7 @@ export class SpectralEffects {
           T.MathUtils.lerp(base.z, tip.z, t) + Math.sin(a * 0.8) * r;
       }
       this.points.geometry.attributes.position.needsUpdate = true;
+      this.points.geometry.attributes.particleAlpha.needsUpdate = true;
       (this.points.material as T.ShaderMaterial).uniforms.power.value = charge;
       this.halo.position.copy(base).lerp(tip, 0.5);
       this.halo.quaternion.setFromUnitVectors(
@@ -109,11 +122,16 @@ export class SpectralEffects {
       uniforms.time.value = time;
       this.light.position.copy(this.halo.position);
     }
-    if(dodging){
-      const uniforms=(this.halo.material as T.ShaderMaterial).uniforms;
-      uniforms.tint.value.set(0x60dfff);uniforms.power.value=.7;uniforms.time.value=time;
-      this.halo.position.copy(root.position);this.halo.position.y+=.75;
-      this.halo.quaternion.copy(root.quaternion);this.halo.rotateX(Math.PI/2);this.halo.scale.set(.7,2.1,.7);
+    if (dodging) {
+      const uniforms = (this.halo.material as T.ShaderMaterial).uniforms;
+      uniforms.tint.value.set(0x60dfff);
+      uniforms.power.value = 0.7;
+      uniforms.time.value = time;
+      this.halo.position.copy(root.position);
+      this.halo.position.y += 0.75;
+      this.halo.quaternion.copy(root.quaternion);
+      this.halo.rotateX(Math.PI / 2);
+      this.halo.scale.set(0.7, 2.1, 0.7);
     }
     this.ghostTime -= dt;
     if (dodging && this.ghostTime <= 0) {

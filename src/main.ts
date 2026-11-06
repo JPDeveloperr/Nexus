@@ -221,6 +221,7 @@ function setMode(next: Mode) {
   if (next === "menu" || next === "defeat" || next === "victory") {
     actions.cancel();
     spectral.reset();
+    crimsonWaves.reset();
   }
   mode = next;
   input.reset();

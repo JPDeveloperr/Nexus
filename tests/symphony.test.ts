@@ -156,7 +156,11 @@ for (const [kind, direction, variant] of [
     const d = new T.Vector3(...direction);
     system.hit(e, 999, true, 1, d.clone().negate());
     assert.equal(e.death?.variant, variant);
-      assert.equal(system.hit(e,999,true,1,player),0,"dead enemies reject further hits");
+    assert.equal(
+      system.hit(e, 999, true, 1, player),
+      0,
+      "dead enemies reject further hits",
+    );
     assert.ok(!system.alive.includes(e));
     assert.equal(
       system.blockers().some((o) => o.x === 0 && o.z === 0),
@@ -179,24 +183,26 @@ for (const [kind, direction, variant] of [
         assert.ok(e.death!.floor >= 0.0249);
         // Recompute the rendered mesh bounds independently of the controller's diagnostic.
         e.body.root.updateWorldMatrix(true, true);
-        const bounds = new T.Box3();
+        let lowest = Infinity;
+        const vertex = new T.Vector3();
         e.body.root.traverse((o) => {
           if (
             o instanceof T.Mesh &&
             !(e.body instanceof Warrior && o === e.body.aura)
           ) {
-            if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
-            bounds.union(
-              o.geometry.boundingBox!.clone().applyMatrix4(o.matrixWorld),
-            );
+            const positions = o.geometry.attributes.position;
+            for (let i = 0; i < positions.count; i++)
+              lowest = Math.min(
+                lowest,
+                vertex
+                  .fromBufferAttribute(positions, i)
+                  .applyMatrix4(o.matrixWorld).y,
+              );
           }
         });
-        assert.ok(
-          bounds.min.y >= 0.0249,
-          `actual geometry crossed floor: ${bounds.min.y}`,
-        );
+        assert.ok(lowest >= 0.0249, `actual geometry crossed floor: ${lowest}`);
         if (e.timer > 1.2)
-          assert.ok(bounds.min.y < 0.026, "resting body must contact floor");
+          assert.ok(lowest < 0.026, "resting body must contact floor");
         assert.ok(Number.isFinite(e.body.root.position.y));
         if (e.body instanceof Warrior) poses.push(e.body.leftShin.rotation.x);
         if (i === 80) assert.equal(e.body.root.visible, true);

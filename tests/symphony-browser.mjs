@@ -29,8 +29,13 @@ await page.addInitScript(() => {
   };
   window.tickFrames = (n = 1, ms = 1000 / 60) => {
     if (!stamp) stamp = now();
-    for (let i = 0; i < n; i++) {
-      stamp += ms;
+    // Coalesce rendering only; the game's accumulator still executes every 60 Hz physics step.
+    // Keep each render below the documented 500 ms catch-up cap.
+    let remaining = n * ms;
+    while (remaining > 1e-8) {
+      const delta = Math.min(400, remaining);
+      stamp += delta;
+      remaining -= delta;
       const q = queue;
       queue = [];
       q.forEach((cb) => cb(stamp));
@@ -327,6 +332,12 @@ try {
           );
           await page.keyboard.up("KeyJ");
           for (let i = 0; i < 8; i++) {
+            // Keep the side-impact fixture oriented: live AI otherwise turns to face the attacker.
+            if (side)
+              await page.evaluate(
+                (id) => window.__nexus.faceEnemy(id, Math.PI / 2),
+                id,
+              );
             await tick(1, 50);
             const s = await snap();
             if (s.enemies[id].state === "dead") {

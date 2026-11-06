@@ -9,7 +9,7 @@ const ease = (x: number) => {
 export const DEATH_DURATION = 2.8;
 /** Captured live pose -> impact -> knee collapse -> gravity fall -> damped rest.
  * Root tilt follows the actual impact in local space, not a fixed global axis.
- * Mesh bounds constrain the entire articulated body above the floor each step.
+ * Mesh vertices constrain the entire articulated body above the floor each step.
  */
 export class DeathMotion {
   private saved: {
@@ -29,8 +29,7 @@ export class DeathMotion {
   private yaw: number;
   private axis: T.Vector3;
   private travel: T.Vector3;
-  private box = new T.Box3();
-  private partBox = new T.Box3();
+  private vertex = new T.Vector3();
   private meshes: T.Mesh[] = [];
   floor = 0;
   readonly variant: "back" | "side" | "heavy" | "floating";
@@ -204,17 +203,22 @@ export class DeathMotion {
           }
       root.updateWorldMatrix(true, true);
     }
-    this.box.makeEmpty();
+    let minimum = Infinity;
     for (const mesh of this.meshes) {
       if (b instanceof Warrior && mesh === b.aura) continue;
-      if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
-      this.partBox
-        .copy(mesh.geometry.boundingBox!)
-        .applyMatrix4(mesh.matrixWorld);
-      this.box.union(this.partBox);
+      const positions = mesh.geometry.attributes.position;
+      // Exact mesh vertices avoid the empty corners of rotated bounding boxes
+      // lifting angular armor and capes visibly above the floor.
+      for (let i = 0; i < positions.count; i++) {
+        this.vertex
+          .fromBufferAttribute(positions, i)
+          .applyMatrix4(mesh.matrixWorld);
+        minimum = Math.min(minimum, this.vertex.y);
+      }
     }
-    root.position.y += Math.max(0, 0.025 - this.box.min.y);
-    this.floor = Math.max(0.025, this.box.min.y);
+    const correction = Math.max(0, 0.025 - minimum);
+    root.position.y += correction;
+    this.floor = minimum + correction;
     const opacity = 1 - ease((t - 2.15) / 0.65);
     for (const item of this.materials) {
       item.m.transparent = true;
